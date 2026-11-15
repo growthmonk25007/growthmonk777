@@ -192,6 +192,15 @@
       .x-rule { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 6px; align-items: center; }
       .x-rule select { width: 100%; min-height: 44px; border: 1px solid var(--x-line); border-radius: 10px; padding: 0 8px; background: #fff; outline-color: var(--x-saffron); }
       .x-conj, .x-tag[data-t="Static"] { color: var(--x-saffron-ink); background: #FBEFDD; } .x-conj { display: inline-block; margin-bottom: 6px; }
+      /* Settings · brand green */
+      .x-ws { font-size: 13px; color: var(--x-muted); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; } .x-ws b { color: var(--x-ink); font: 600 14px var(--x-head); }
+      .x-stabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+      .x-stabs .x-tab[aria-pressed="true"] { border-color: var(--x-primary); background: #E6F2EE; color: var(--x-primary) !important; }
+      .x-set :focus { outline-color: var(--x-primary); } .x-set td select { min-height: 44px; border: 1px solid var(--x-line); border-radius: 10px; padding: 0 10px; background: #fff; }
+      .x-stg li { display: flex; align-items: center; gap: 6px; border-left-color: var(--x-primary); } .x-stg input { flex: 1; min-width: 0; }
+      .x-tag[data-u="Active"] { background: #E6F2EE; } .x-tag[data-u="Invited"] { background: #FBF0DA; color: #7A4F00; } .x-tag[data-u="Deactivated"] { background: #EEF1F4; color: #475467; }
+      .x-cur { border-top: 3px solid var(--x-primary); } .x-per { font: 500 13px var(--x-ui); color: var(--x-muted); }
+      .x-feat { margin: 0 0 16px; padding-left: 18px; display: grid; gap: 4px; }
       @media (max-width: 600px) { .x-rule { grid-template-columns: 1fr 1fr; } }
       @media (max-width: 1100px) { .x-ed { grid-template-columns: 1fr; } .x-mail { position: static; } }
       @media (max-width: 1100px) { .x-s8, .x-s4 { grid-column: span 12; } .x-s2 { grid-column: span 4; } .x-checks { grid-template-columns: 1fr 1fr; } }
@@ -220,6 +229,7 @@
             <header class="x-top">
               <button class="x-icon x-menu" id="menu" aria-label="Open menu">☰</button>
               <div class="x-sw"><input class="x-search" type="search" placeholder="Search contacts…" aria-label="Search contacts" id="search" autocomplete="off" aria-controls="sdrop" /><ul class="x-drop" id="sdrop" hidden></ul></div>
+              <span class="x-ws">Workspace <b id="ws">Growth Monk</b></span>
               <span class="x-pill">Prototype · sample data</span>
               <button class="x-btn" id="create">+ Create</button>
               <button class="x-icon" id="bell" aria-label="Notifications"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg><i></i></button>
@@ -280,10 +290,10 @@ Karthik Subramanian|5|Customer|95|Ananya|720
 Divya Menon|5|MQL|67|Ananya|4320
 Jonas Weber|6|Lead|44|Meera|2160
 Aisha Khan|6|SQL|76|Meera|480
-Rajesh Choudhary|7|Subscriber|22|Vikram|20160
+Rajesh Choudhary|7|Subscriber|22|Vikram|30240
 Ishita Bansal|7|MQL|63|Vikram|1800
 Emily Tremblay|8|Customer|90|Ananya|3000
-Liam Brooks|8|Subscriber|15|Ananya|14400
+Liam Brooks|8|Subscriber|15|Ananya|25920
 Aditya Desai|9|SQL|73|Meera|150
 Fatima Sheikh|9|Lead|49|Meera|5760
 Wei Ling Tan|10|MQL|69|Vikram|900
@@ -451,7 +461,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       // Marketing: email campaigns
       const SEGS = { "All contacts": () => state.contacts.length, Customers: () => state.contacts.filter((c) => c.stage === "Customer").length, Leads: () => state.contacts.filter((c) => ["Lead", "MQL", "SQL"].includes(c.stage)).length };
       // CRM: segments, rule-based (Active) or a fixed snapshot (Static); their counts feed the send step via SEGS
-      const SF = { "Lifecycle stage": (c) => c.stage, "Lead score": (c) => c.score, Company: (c) => c.company, City: (c) => state.companies.find((x) => x.name === c.company)?.city || "", Owner: (c) => c.owner };
+      const SF = { "Lifecycle stage": (c) => c.stage, "Lead score": (c) => c.score, Company: (c) => c.company, City: (c) => state.companies.find((x) => x.name === c.company)?.city || "", Owner: (c) => c.owner, "Last activity": (c) => Math.floor(c.m / 1440) };
       const SOP = ["is", "is not", "greater than", "less than", "contains"];
       const rule = (f, op, v) => ({ f, op, v: String(v) });
       const test = (c, r) => { const a = SF[r.f](c), x = String(a).toLowerCase(), y = r.v.trim().toLowerCase();
@@ -462,13 +472,12 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         { id: 1, name: "All customers", type: "Active", match: "and", rules: [rule("Lifecycle stage", "is", "Customer")] },
         { id: 2, name: "Bengaluru leads", type: "Active", match: "and", rules: [rule("City", "is", "Bengaluru"), rule("Lifecycle stage", "is not", "Customer")] },
         { id: 3, name: "Hot leads (score ≥ 70)", type: "Active", match: "and", rules: [rule("Lead score", "greater than", 69), rule("Lifecycle stage", "is not", "Customer")] },
-        { id: 4, name: "Unengaged 30 days", type: "Static", match: "and", rules: [rule("Lifecycle stage", "is", "Subscriber")] },
+        { id: 4, name: "Unengaged 30 days", type: "Active", match: "and", rules: [rule("Last activity", "greater than", 14)] },
       ];
-      state.segs[3].ids = live(state.segs[3]).map((c) => c.id);
       const segSync = () => { Object.keys(SEGS).slice(3).forEach((k) => delete SEGS[k]); state.segs.forEach((s) => (SEGS[s.name] = () => members(s).length)); };
       segSync();
       const plural = (n) => `${n} ${n === 1 ? "contact" : "contacts"}`;
-      const sumRules = (s) => s.rules.filter((r) => r.v.trim()).map((r) => `${r.f} ${r.op} ${r.v}`).join(s.match === "or" ? " OR " : " AND ") || "Everyone";
+      const sumRules = (s) => s.rules.filter((r) => r.v.trim()).map((r) => `${r.f} ${r.op} ${r.v}${r.f === "Last activity" ? " days ago" : ""}`).join(s.match === "or" ? " OR " : " AND ") || "Everyone";
       function segments(v) { ui.seg ? segEdit(v) : segList(v); }
       function segList(v) {
         v.innerHTML = `<div class="x-headrow"><div><h1>Segments</h1><p class="x-sub">${state.segs.length} segments, counted live from your contacts. Click one to open it.</p></div><button class="x-btn" data-sga="new">+ New segment</button></div>
@@ -481,7 +490,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       const SVALS = () => ({ "Lifecycle stage": STAGES, Company: state.companies.map((c) => c.name), City: [...new Set(state.companies.map((c) => c.city))], Owner: [...new Set(state.contacts.map((c) => c.owner))] });
       const rulesHTML = (s) => s.rules.map((r, i) => `<li>${i ? `<span class="x-tag x-conj">${s.match.toUpperCase()}</span>` : ""}<div class="x-rule">
           <select data-sr="f" data-i="${i}" aria-label="Rule ${i + 1} field">${opts(Object.keys(SF), r.f)}</select><select data-sr="op" data-i="${i}" aria-label="Rule ${i + 1} operator">${opts(SOP, r.op)}</select>
-          <input data-sr="v" data-i="${i}" value="${esc(r.v)}" list="${slug(r.f)}" ${r.f === "Lead score" ? 'inputmode="numeric"' : ""} aria-label="Rule ${i + 1} value" placeholder="Value" />
+          <input data-sr="v" data-i="${i}" value="${esc(r.v)}" list="${slug(r.f)}" ${r.f === "Lead score" || r.f === "Last activity" ? 'inputmode="numeric"' : ""} aria-label="Rule ${i + 1} value" placeholder="${r.f === "Last activity" ? "Days ago" : "Value"}" />
           <button class="x-ib" data-sga="del" data-i="${i}" aria-label="Remove rule ${i + 1}">✕</button></div></li>`).join("");
       function segPrev() {
         const m = live(ui.seg);
@@ -939,7 +948,107 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (d.kq != null) { ui.kb.q = e.target.value; $("#kbl").innerHTML = kbList(); }
         else if (d.ke) { ui.kb.ed[d.ke] = e.target.value; kbPrev(); } });
       $("#view").addEventListener("keydown", (e) => { if (e.target.matches("[data-aid]") && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); kbOpen(+e.target.dataset.aid); } });
-      const routes = { dashboard, contacts, companies, segments, campaigns, forms, "help-desk": helpdesk, "knowledge-base": kb, "ticket-board": (v) => { ui.tk.view = "board"; helpdesk(v); } };
+      // Settings: account, users, lifecycle stages (shared STAGES), SLA targets (shared SLAH), billing
+      Object.assign(state, { co: "Growth Monk", tz: "Asia/Kolkata (UTC+05:30)", cur: "INR" });
+      const ROLES = ["Admin", "Agent", "Marketer"], TZS = ["Asia/Kolkata (UTC+05:30)", "Asia/Singapore (UTC+08:00)", "Asia/Dubai (UTC+04:00)", "Europe/London (UTC+00:00)", "America/New_York (UTC−05:00)"];
+      state.users = [["Growth Monk", "admin", "Admin", "Active"], ["Ananya Rao", "ananya", "Agent", "Active"], ["Vikram Singh", "vikram", "Agent", "Active"], ["Meera Iyer", "meera", "Marketer", "Active"], ["Kabir Mehta", "kabir", "Marketer", "Invited"]]
+        .map(([name, e, role, status], i) => ({ id: i + 1, name, email: `${e}@growthmonk.in`, role, status }));
+      const PLANS = [["Starter", 1499, 3, ["Contacts and segments", "Email campaigns", "One help desk inbox"]], ["Pro", 4999, 10, ["Everything in Starter", "Forms and automations", "SLAs and knowledge base"]], ["Enterprise", 14999, 0, ["Everything in Pro", "SSO and audit log", "Dedicated success manager"]]];
+      const STABS = [["account", "Account"], ["users", "Users & teams"], ["stages", "Pipelines & stages"], ["sla", "SLAs"], ["billing", "Billing"]];
+      const inr = (n) => "₹" + n.toLocaleString("en-IN"), inUse = (s) => state.contacts.filter((c) => c.stage === s).length;
+      const admins = () => state.users.filter((u) => u.role === "Admin" && u.status !== "Deactivated").length;
+      ui.set = "account";
+      function settings(v, focus) {
+        const seats = state.users.filter((u) => u.status !== "Deactivated").length;
+        const body = {
+          account: () => `<div class="x-card" style="max-width:560px"><h2>Account</h2><p class="x-sub">The company name shows as your workspace in the top bar.</p>
+            <label class="x-fl">Company name<input data-sa="co" value="${esc(state.co)}" /></label>
+            <label class="x-fl">Time zone<select data-sa="tz">${opts(TZS, state.tz)}</select></label>
+            <label class="x-fl">Currency<select data-sa="cur">${opts(["INR", "USD"], state.cur)}</select></label>
+            <button class="x-btn" data-st="acct">Save changes</button></div>`,
+          users: () => `<div class="x-card"><div class="x-headrow"><div><h2>Users & teams</h2><p class="x-sub">${seats} seats in use. Change a role straight from the list.</p></div><button class="x-btn" data-st="invite">+ Invite user</button></div>
+            <div class="x-scroll">${table([{ label: "Name", render: (u) => person(u.name) }, { label: "Email", render: (u) => `<span class="x-muted">${esc(u.email)}</span>` },
+              { label: "Role", render: (u) => `<select data-ur="${u.id}" aria-label="Role for ${esc(u.name)}" ${u.status === "Deactivated" ? "disabled" : ""}>${opts(ROLES, u.role)}</select>` },
+              { label: "Status", render: (u) => `<span class="x-tag" data-u="${u.status}">${u.status}</span>` },
+              { label: "", render: (u) => (u.id === 1 ? `<span class="x-muted">You</span>` : `<button class="x-btn x-btn--ghost" data-ud="${u.id}">${u.status === "Deactivated" ? "Reactivate" : "Deactivate"}</button>`) }], state.users)}</div></div>`,
+          stages: () => `<div class="x-card" style="max-width:680px"><h2>Lifecycle stages</h2><p class="x-sub">First to last. Contacts use these in the stage dropdown and filter.</p>
+            <ol class="x-blocks x-stg">${STAGES.map((s, i) => `<li><input data-sn="${i}" value="${esc(s)}" aria-label="Stage ${i + 1} name" /><span class="x-pill">${plural(inUse(s))}</span>
+              <button class="x-ib" data-sm="${i}" data-d="-1" ${i ? "" : "disabled"} aria-label="Move ${esc(s)} up">↑</button><button class="x-ib" data-sm="${i}" data-d="1" ${i < STAGES.length - 1 ? "" : "disabled"} aria-label="Move ${esc(s)} down">↓</button><button class="x-ib" data-sx="${i}" aria-label="Delete ${esc(s)}">✕</button></li>`).join("")}</ol>
+            <div class="x-tools"><input id="sadd" placeholder="New stage name" aria-label="New stage name" /><button class="x-btn" data-st="stage">+ Add stage</button></div></div>`,
+          sla: () => `<div class="x-card" style="max-width:560px"><h2>Response targets</h2><p class="x-sub">Hours to first response, by priority. Help desk SLA chips count down from these.</p>
+            <div class="x-tk2">${[...PRI].reverse().map((p) => `<label class="x-fl"><span>${pchip(p)}<small class="x-muted">hours</small></span><input type="number" min="1" max="720" step="1" inputmode="numeric" data-sh="${p}" value="${SLAH[p]}" aria-label="${p} target in hours" /></label>`).join("")}</div>
+            <button class="x-btn" data-st="sla">Save targets</button></div>`,
+          billing: () => `<div class="x-grid"><div class="x-card x-s12"><div class="x-headrow"><div><span class="x-badge">Pro trial · 12 days left</span><h2 style="margin-top:10px">Pro plan</h2><p class="x-sub" style="margin:0">${inr(4999)} a month after the trial. No card on file yet.</p></div>
+              <div class="x-kpi" style="min-width:220px"><div class="x-lab">Seats</div><div class="x-fig">${seats} of 10</div><div class="x-progress" role="progressbar" aria-valuenow="${seats}" aria-valuemin="0" aria-valuemax="10"><span style="width:${Math.min(100, seats * 10)}%"></span></div></div></div></div>
+            ${PLANS.map(([n, p, s, f]) => `<div class="x-card x-kpi x-s4 ${n === "Pro" ? "x-cur" : ""}"><div class="x-lab">${n}${n === "Pro" ? ` <span class="x-tag">Current · trial</span>` : ""}</div><div class="x-fig">${inr(p)}<span class="x-per"> /month</span></div>
+              <p class="x-sub">${s ? `Up to ${s} seats` : "Unlimited seats"}</p><ul class="x-feat">${f.map((x) => `<li>${x}</li>`).join("")}</ul>
+              <button class="x-btn ${n === "Starter" ? "x-btn--ghost" : ""}" data-st="plan">${n === "Starter" ? "Switch to Starter" : n === "Pro" ? "Upgrade to paid Pro" : "Upgrade"}</button></div>`).join("")}</div>`,
+        };
+        v.innerHTML = `<h1>Settings</h1><p class="x-sub">Workspace, team, pipeline, service targets and billing. Saved in this session only.</p>
+          <div class="x-stabs" role="group" aria-label="Settings sections">${STABS.map(([k, l]) => `<button class="x-btn x-btn--ghost x-tab" data-stab="${k}" aria-pressed="${k === ui.set}">${l}</button>`).join("")}</div><div class="x-set">${body[ui.set]()}</div>`;
+        if (focus) v.querySelector(focus)?.focus();
+      }
+      $("#view").addEventListener("click", (e) => {
+        const a = e.target.closest("[data-stab], [data-st], [data-ud], [data-sm], [data-sx]");
+        if (!a || !$(".x-stabs")) return;
+        const d = a.dataset, go = (f) => settings($("#view"), f), val = (k) => $(`[data-sa="${k}"]`).value;
+        if (d.stab) { ui.set = d.stab; go(`[data-stab="${d.stab}"]`); }
+        else if (d.st === "acct") {
+          const co = val("co").trim();
+          if (!co) { toast("Add a company name."); return $('[data-sa="co"]').focus(); }
+          Object.assign(state, { co, tz: val("tz"), cur: val("cur") }); $("#ws").textContent = co; toast("Account settings saved.");
+        } else if (d.st === "invite") {
+          modal("Invite user", `<label>Name<input name="name" required placeholder="e.g. Kavya Menon" /></label><label>Email<input name="email" type="email" required placeholder="name@company.com" /></label><label>Role<select name="role">${opts(ROLES, "Agent")}</select></label>`, (f) => {
+            const name = f.name.trim(), email = f.email.trim().toLowerCase();
+            if (!name) return "Enter a name.";
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email address.";
+            if (state.users.some((u) => u.email === email)) return "This person is already in the workspace.";
+            state.users.push({ id: Date.now(), name, email, role: f.role, status: "Invited" }); go(); toast(`Invite sent to ${email}.`);
+          });
+          [...document.querySelectorAll(".x-modal")].pop().querySelector(".x-row .x-btn:last-child").textContent = "Send invite";
+        } else if (d.ud) {
+          const u = state.users.find((x) => x.id == d.ud);
+          if (u.status === "Deactivated") { u.status = u.was || "Active"; toast(`${u.name} reactivated.`); }
+          else if (u.role === "Admin" && admins() === 1) return toast("Keep at least one active admin.");
+          else { u.was = u.status; u.status = "Deactivated"; toast(`${u.name} deactivated.`); }
+          go(`[data-ud="${u.id}"]`);
+        } else if (d.sm) {
+          const i = +d.sm, j = i + +d.d;
+          [STAGES[i], STAGES[j]] = [STAGES[j], STAGES[i]]; go(`[data-sn="${j}"]`); toast(`${STAGES[j]} moved ${+d.d < 0 ? "up" : "down"}.`);
+        } else if (d.sx) {
+          const s = STAGES[+d.sx], n = inUse(s);
+          if (n) return toast(`${plural(n)} ${n === 1 ? "is" : "are"} in ${s}. Move them to another stage first.`);
+          if (STAGES.length < 2) return toast("Keep at least one stage.");
+          STAGES.splice(+d.sx, 1); if (ui.stage === s) ui.stage = ""; go("#sadd"); toast(`Stage “${s}” deleted.`);
+        } else if (d.st === "stage") {
+          const s = $("#sadd").value.trim();
+          if (!s || STAGES.some((x) => x.toLowerCase() === s.toLowerCase())) { toast(s ? "That stage already exists." : "Name the new stage."); return $("#sadd").focus(); }
+          STAGES.push(s); go("#sadd"); toast(`Stage “${s}” added.`);
+        } else if (d.st === "sla") {
+          const ins = [...document.querySelectorAll("[data-sh]")], bad = ins.find((x) => !(Number.isInteger(+x.value) && +x.value >= 1 && +x.value <= 720));
+          if (bad) { toast("Use whole hours from 1 to 720."); return bad.focus(); }
+          ins.forEach((x) => (SLAH[x.dataset.sh] = +x.value));
+          const over = state.tickets.filter((t) => sla(t).includes('"over"')).length;
+          toast(`SLA targets saved · ${over} open ${over === 1 ? "ticket" : "tickets"} overdue.`);
+        } else if (d.st === "plan") toast("Plan change simulated.");
+      });
+      $("#view").addEventListener("change", (e) => {
+        const d = e.target.dataset;
+        if (d.ur) {
+          const u = state.users.find((x) => x.id == d.ur);
+          if (u.role === "Admin" && admins() === 1) { e.target.value = "Admin"; return toast("Keep at least one active admin."); }
+          u.role = e.target.value; toast(`${u.name} is now ${u.role}.`);
+        } else if (d.sn) {
+          const i = +d.sn, old = STAGES[i], s = e.target.value.trim();
+          if (!s || STAGES.some((x, k) => k !== i && x.toLowerCase() === s.toLowerCase())) { e.target.value = old; return toast(s ? "That stage already exists." : "A stage needs a name."); }
+          if (s === old) return;
+          STAGES[i] = s; state.contacts.forEach((c) => c.stage === old && (c.stage = s)); if (ui.stage === old) ui.stage = s;
+          state.segs.forEach((g) => g.rules.forEach((r) => r.f === "Lifecycle stage" && r.v === old && (r.v = s)));
+          toast(`Stage renamed to “${s}”.`);
+        }
+      });
+      $("#view").addEventListener("keydown", (e) => { if (e.target.id === "sadd" && e.key === "Enter") $('[data-st="stage"]').click(); });
+      const routes = { dashboard, contacts, companies, segments, campaigns, forms, settings, "help-desk": helpdesk, "knowledge-base": kb, "ticket-board": (v) => { ui.tk.view = "board"; helpdesk(v); } };
       NAV.forEach(([, items]) => items.forEach(([id, label]) => { if (!routes[id]) routes[id] = empty(label); }));
 
       function render() {
