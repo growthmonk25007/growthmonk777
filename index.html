@@ -189,6 +189,10 @@
       .x-view .x-kart h1 { margin: 4px 0 12px; overflow-wrap: anywhere; }
       .x-md { font-size: 15px; line-height: 1.65; overflow-wrap: anywhere; } .x-md h3 { font: 600 17px/1.3 var(--x-head); margin: 18px 0 6px; } .x-md p, .x-md ul { margin: 0 0 10px; } .x-md ul { padding-left: 20px; }
       .x-kfb { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--x-line); }
+      .x-rule { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 6px; align-items: center; }
+      .x-rule select { width: 100%; min-height: 44px; border: 1px solid var(--x-line); border-radius: 10px; padding: 0 8px; background: #fff; outline-color: var(--x-saffron); }
+      .x-conj, .x-tag[data-t="Static"] { color: var(--x-saffron-ink); background: #FBEFDD; } .x-conj { display: inline-block; margin-bottom: 6px; }
+      @media (max-width: 600px) { .x-rule { grid-template-columns: 1fr 1fr; } }
       @media (max-width: 1100px) { .x-ed { grid-template-columns: 1fr; } .x-mail { position: static; } }
       @media (max-width: 1100px) { .x-s8, .x-s4 { grid-column: span 12; } .x-s2 { grid-column: span 4; } .x-checks { grid-template-columns: 1fr 1fr; } }
       @media (max-width: 820px) {
@@ -430,7 +434,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
             <dt><label for="ds">Lifecycle stage</label></dt><dd><select id="ds">${STAGES.map((s) => `<option ${s === c.stage ? "selected" : ""}>${s}</option>`).join("")}</select></dd></dl>
           <h3>Activity</h3><form class="x-notef"><textarea name="note" rows="3" placeholder="Add a note…" aria-label="Note"></textarea><button class="x-btn">Add note</button></form>
           <ol class="x-tl">${c.acts.map(([t, m]) => `<li><b>${esc(t)}</b><span>${ago(m)}</span></li>`).join("")}</ol></aside>`; };
-        const touch = (act, msg, focus) => { c.acts.unshift([act, 0]); c.m = 0; draw(); el.querySelector(focus).focus(); if ($("#ct")) renderContacts(); toast(msg); };
+        const touch = (act, msg, focus) => { c.acts.unshift([act, 0]); c.m = 0; draw(); el.querySelector(focus).focus(); if ($("#ct")) renderContacts(); if ($("#sgp")) segPrev(); toast(msg); };
         draw();
         el.addEventListener("click", (e) => { if (e.target === el || e.target.closest("[data-x]")) closeDrawer(); });
         el.addEventListener("change", (e) => { if (e.target.id === "ds") { c.stage = e.target.value; touch(`Stage changed to ${c.stage}`, `${c.name} moved to ${c.stage}`, "#ds"); } });
@@ -446,6 +450,90 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       }
       // Marketing: email campaigns
       const SEGS = { "All contacts": () => state.contacts.length, Customers: () => state.contacts.filter((c) => c.stage === "Customer").length, Leads: () => state.contacts.filter((c) => ["Lead", "MQL", "SQL"].includes(c.stage)).length };
+      // CRM: segments, rule-based (Active) or a fixed snapshot (Static); their counts feed the send step via SEGS
+      const SF = { "Lifecycle stage": (c) => c.stage, "Lead score": (c) => c.score, Company: (c) => c.company, City: (c) => state.companies.find((x) => x.name === c.company)?.city || "", Owner: (c) => c.owner };
+      const SOP = ["is", "is not", "greater than", "less than", "contains"];
+      const rule = (f, op, v) => ({ f, op, v: String(v) });
+      const test = (c, r) => { const a = SF[r.f](c), x = String(a).toLowerCase(), y = r.v.trim().toLowerCase();
+        return r.op === "is" ? x === y : r.op === "is not" ? x !== y : r.op === "contains" ? x.includes(y) : r.op === "greater than" ? +a > +r.v : +a < +r.v; };
+      const live = (s) => { const rs = s.rules.filter((r) => r.v.trim()); return state.contacts.filter((c) => !rs.length || rs[s.match === "or" ? "some" : "every"]((r) => test(c, r))); };
+      const members = (s) => (s.type === "Static" ? state.contacts.filter((c) => s.ids.includes(c.id)) : live(s));
+      state.segs = [
+        { id: 1, name: "All customers", type: "Active", match: "and", rules: [rule("Lifecycle stage", "is", "Customer")] },
+        { id: 2, name: "Bengaluru leads", type: "Active", match: "and", rules: [rule("City", "is", "Bengaluru"), rule("Lifecycle stage", "is not", "Customer")] },
+        { id: 3, name: "Hot leads (score ≥ 70)", type: "Active", match: "and", rules: [rule("Lead score", "greater than", 69), rule("Lifecycle stage", "is not", "Customer")] },
+        { id: 4, name: "Unengaged 30 days", type: "Static", match: "and", rules: [rule("Lifecycle stage", "is", "Subscriber")] },
+      ];
+      state.segs[3].ids = live(state.segs[3]).map((c) => c.id);
+      const segSync = () => { Object.keys(SEGS).slice(3).forEach((k) => delete SEGS[k]); state.segs.forEach((s) => (SEGS[s.name] = () => members(s).length)); };
+      segSync();
+      const plural = (n) => `${n} ${n === 1 ? "contact" : "contacts"}`;
+      const sumRules = (s) => s.rules.filter((r) => r.v.trim()).map((r) => `${r.f} ${r.op} ${r.v}`).join(s.match === "or" ? " OR " : " AND ") || "Everyone";
+      function segments(v) { ui.seg ? segEdit(v) : segList(v); }
+      function segList(v) {
+        v.innerHTML = `<div class="x-headrow"><div><h1>Segments</h1><p class="x-sub">${state.segs.length} segments, counted live from your contacts. Click one to open it.</p></div><button class="x-btn" data-sga="new">+ New segment</button></div>
+          <div class="x-card"><div class="x-scroll">${table([
+            { label: "Segment", render: (s) => `<span class="x-cn"><b>${esc(s.name)}</b><small>${esc((s.type === "Static" ? "Fixed list · " : "") + sumRules(s))}</small></span>` },
+            { label: "Type", render: (s) => `<span class="x-tag" data-t="${s.type}">${s.type}</span>` },
+            { label: "Contacts", render: (s) => plural(members(s).length) }], state.segs, (s) => `class="x-click" data-seg="${s.id}" tabindex="0"`)}</div></div>`;
+      }
+      const slug = (f) => "sgl-" + f.replace(/\W/g, "");
+      const SVALS = () => ({ "Lifecycle stage": STAGES, Company: state.companies.map((c) => c.name), City: [...new Set(state.companies.map((c) => c.city))], Owner: [...new Set(state.contacts.map((c) => c.owner))] });
+      const rulesHTML = (s) => s.rules.map((r, i) => `<li>${i ? `<span class="x-tag x-conj">${s.match.toUpperCase()}</span>` : ""}<div class="x-rule">
+          <select data-sr="f" data-i="${i}" aria-label="Rule ${i + 1} field">${opts(Object.keys(SF), r.f)}</select><select data-sr="op" data-i="${i}" aria-label="Rule ${i + 1} operator">${opts(SOP, r.op)}</select>
+          <input data-sr="v" data-i="${i}" value="${esc(r.v)}" list="${slug(r.f)}" ${r.f === "Lead score" ? 'inputmode="numeric"' : ""} aria-label="Rule ${i + 1} value" placeholder="Value" />
+          <button class="x-ib" data-sga="del" data-i="${i}" aria-label="Remove rule ${i + 1}">✕</button></div></li>`).join("");
+      function segPrev() {
+        const m = live(ui.seg);
+        $("#sgn").textContent = `${plural(m.length)} ${m.length === 1 ? "matches" : "match"} right now`;
+        $("#sgp").innerHTML = m.length ? `<div class="x-scroll">${table([{ label: "Name", render: (c) => person(c.name, c.company) }, { label: "Lifecycle", render: (c) => chip(c.stage) }, { label: "Lead score", render: (c) => scoreBar(c.score) }], m.slice(0, 10), (c) => `class="x-click" data-open="${c.id}" tabindex="0"`)}</div>${m.length > 10 ? `<p class="x-sub" style="margin:10px 0 0">Showing the first 10 of ${m.length}.</p>` : ""}` : `<p class="x-sub" style="text-align:center;margin:24px 0">No contacts match these rules.</p>`;
+      }
+      function segEdit(v, focus) {
+        const s = ui.seg, vals = SVALS();
+        v.innerHTML = `<button class="x-sort x-muted" data-sga="back">← All segments</button>
+          <div class="x-headrow"><div><h1>${s.id ? esc(s.name) : "New segment"}</h1><p class="x-sub">Add rules on the left; matching contacts update on the right. Click one to open it.</p></div><button class="x-btn" data-sga="save">Save segment</button></div>
+          <div class="x-ed"><div class="x-card">
+            <label class="x-fl">Segment name<input data-sg="name" value="${esc(s.name)}" placeholder="e.g. Pune customers" /></label>
+            <label class="x-fl">Type<select data-sg="type">${opts(["Active", "Static"], s.type)}</select></label>
+            <p class="x-sub" style="margin-top:-6px">${s.type === "Static" ? `Static: saving fixes the list to whoever matches then.${s.ids ? ` Saved list: ${plural(members(s).length)}.` : ""}` : "Active: contacts join and leave as they match the rules."}</p>
+            <div class="x-headrow"><h2>Rules</h2><div class="x-tools" role="group" aria-label="Combine rules">${["and", "or"].map((m) => `<button class="x-btn x-btn--ghost x-tab" data-sgm="${m}" aria-pressed="${s.match === m}">${m === "and" ? "Match all (AND)" : "Match any (OR)"}</button>`).join("")}</div></div>
+            <ol class="x-blocks">${rulesHTML(s)}</ol>
+            ${Object.entries(vals).map(([f, l]) => `<datalist id="${slug(f)}">${l.map((o) => `<option value="${esc(o)}">`).join("")}</datalist>`).join("")}
+            <div class="x-tools"><button class="x-btn x-btn--ghost" data-sga="add">+ Add rule</button></div>
+          </div><div class="x-card x-mail"><h2>Preview</h2><p class="x-sub" id="sgn" aria-live="polite"></p><div id="sgp"></div></div></div>`;
+        segPrev();
+        if (focus) v.querySelector(focus)?.focus();
+      }
+      function segSave() {
+        const s = ui.seg, name = s.name.trim(), old = state.segs.find((x) => x.id === s.id);
+        if (!name) { toast("Name the segment before saving."); return $('[data-sg="name"]').focus(); }
+        if (SEGS[name] && name !== old?.name) { toast("A segment with this name already exists."); return $('[data-sg="name"]').focus(); }
+        Object.assign(s, { name, ids: s.type === "Static" ? live(s).map((c) => c.id) : undefined });
+        if (old) state.segs[state.segs.indexOf(old)] = s; else state.segs.push(Object.assign(s, { id: Date.now() }));
+        segSync(); ui.seg = null; segList($("#view")); toast(`Segment “${name}” saved · ${plural(members(s).length)}.`);
+      }
+      const openSeg = (id) => { const s = state.segs.find((x) => x.id == id); if (s) { ui.seg = structuredClone(s); segEdit($("#view")); $("#view").scrollTop = 0; } };
+      $("#view").addEventListener("click", (e) => {
+        const a = e.target.closest("[data-sga], [data-sgm]"), row = e.target.closest("tr[data-seg]"), s = ui.seg, v = $("#view");
+        if (row) return openSeg(row.dataset.seg);
+        if (!a) return;
+        const act = a.dataset.sga, i = +a.dataset.i;
+        if (a.dataset.sgm) { s.match = a.dataset.sgm; segEdit(v, `[data-sgm="${s.match}"]`); }
+        else if (act === "new") { ui.seg = { id: 0, name: "", type: "Active", match: "and", rules: [rule("Lifecycle stage", "is", "")] }; segEdit(v, '[data-sg="name"]'); }
+        else if (act === "back") { ui.seg = null; segList(v); }
+        else if (act === "add") { s.rules.push(rule("Lifecycle stage", "is", "")); segEdit(v, `[data-sr="f"][data-i="${s.rules.length - 1}"]`); }
+        else if (act === "del") { s.rules.splice(i, 1); segEdit(v, '[data-sga="add"]'); }
+        else if (act === "save") segSave();
+      });
+      $("#view").addEventListener("keydown", (e) => { const o = e.target.closest("tr[data-seg]"); if (o && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openSeg(o.dataset.seg); } });
+      $("#view").addEventListener("input", (e) => {
+        const s = ui.seg, d = e.target.dataset;
+        if (!s || (!d.sg && !d.sr)) return;
+        if (d.sg) s[d.sg] = e.target.value; else s.rules[+d.i][d.sr] = e.target.value;
+        if (d.sg === "type") segEdit($("#view"), '[data-sg="type"]');
+        else if (d.sr === "f") segEdit($("#view"), `[data-sr="f"][data-i="${d.i}"]`);
+        else segPrev();
+      });
       const BL = { h: ["Heading", "A new heading"], p: ["Text", "Write your message here."], b: ["Button", "Learn more"] };
       const blk = (s) => s.split("|").map((x) => ({ t: x[0], text: x.slice(2) }));
       const camp = (id, name, status, segment, subject, preview, b, extra) => ({ id, name, status, segment, subject, preview, blocks: blk(b), ...extra });
@@ -504,7 +592,8 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (!c.subject.trim()) { toast("Add a subject line before sending."); return $('[data-f="subject"]').focus(); }
         if (!c.blocks.length) return toast("Add at least one block before sending.");
         const label = (s) => `${SEGS[s]()} ${SEGS[s]() === 1 ? "recipient" : "recipients"}`;
-        modal("Send campaign", `<label>Segment<select name="segment" id="sseg">${Object.keys(SEGS).map((s) => `<option ${s === c.segment ? "selected" : ""}>${s}</option>`).join("")}</select></label><p class="x-sub" id="rc" aria-live="polite">${label(c.segment)}</p>`, (d) => {
+        const o = (s) => `<option ${s === c.segment ? "selected" : ""}>${esc(s)}</option>`, k = Object.keys(SEGS);
+        modal("Send campaign", `<label>Segment<select name="segment" id="sseg">${k.slice(0, 3).map(o).join("")}<optgroup label="Segments">${k.slice(3).map(o).join("")}</optgroup></select></label><p class="x-sub" id="rc" aria-live="polite">${label(c.segment)}</p>`, (d) => {
           const n = SEGS[d.segment]();
           if (!n) return "This segment has no contacts yet.";
           const name = c.name.trim() || c.subject.trim();
@@ -850,13 +939,14 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (d.kq != null) { ui.kb.q = e.target.value; $("#kbl").innerHTML = kbList(); }
         else if (d.ke) { ui.kb.ed[d.ke] = e.target.value; kbPrev(); } });
       $("#view").addEventListener("keydown", (e) => { if (e.target.matches("[data-aid]") && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); kbOpen(+e.target.dataset.aid); } });
-      const routes = { dashboard, contacts, companies, campaigns, forms, "help-desk": helpdesk, "knowledge-base": kb, "ticket-board": (v) => { ui.tk.view = "board"; helpdesk(v); } };
+      const routes = { dashboard, contacts, companies, segments, campaigns, forms, "help-desk": helpdesk, "knowledge-base": kb, "ticket-board": (v) => { ui.tk.view = "board"; helpdesk(v); } };
       NAV.forEach(([, items]) => items.forEach(([id, label]) => { if (!routes[id]) routes[id] = empty(label); }));
 
       function render() {
         const id = location.hash.slice(2) || "dashboard", view = routes[id] ? id : "dashboard";
         charts.forEach((c) => c.destroy()); charts = [];
         if (view !== "campaigns") ui.camp = null;
+        if (view !== "segments") ui.seg = null;
         if (view !== "forms") ui.form = null;
         if (view !== "knowledge-base") ui.kb.mode = "list";
         $("#nav").innerHTML = NAV.map(([group, items]) => (group ? `<h4>${group}</h4>` : "") + items.map(([i, l, ic]) => `<a href="#/${i}" class="${i === view ? "is-on" : ""}" ${i === view ? 'aria-current="page"' : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[ic]}"/></svg>${l}</a>`).join("")).join("");
