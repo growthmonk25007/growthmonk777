@@ -201,6 +201,23 @@
       .x-tag[data-u="Active"] { background: #E6F2EE; } .x-tag[data-u="Invited"] { background: #FBF0DA; color: #7A4F00; } .x-tag[data-u="Deactivated"] { background: #EEF1F4; color: #475467; }
       .x-cur { border-top: 3px solid var(--x-primary); } .x-per { font: 500 13px var(--x-ui); color: var(--x-muted); }
       .x-feat { margin: 0 0 16px; padding-left: 18px; display: grid; gap: 4px; }
+      /* Automations · Marketing Saffron accent, green for On and main actions */
+      .x-tg { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 4px; border: 0; background: none; cursor: pointer; font-weight: 700; color: var(--x-muted) !important; }
+      .x-tg i { position: relative; width: 36px; height: 20px; border-radius: 999px; background: #C9D3CF; transition: background .2s; }
+      .x-tg i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s; }
+      .x-tg[aria-checked="true"] { color: var(--x-primary) !important; } .x-tg[aria-checked="true"] i { background: var(--x-primary); } .x-tg[aria-checked="true"] i::after { transform: translateX(16px); }
+      .x-flow { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 28px; }
+      .x-flow > li { position: relative; padding: 8px 10px 10px; border: 1px solid var(--x-line); border-left: 3px solid var(--x-saffron); border-radius: 10px; background: var(--x-bg); transition: background .2s, box-shadow .2s; }
+      .x-flow > li + li::before { content: ""; position: absolute; left: 50%; top: -29px; height: 28px; border-left: 2px dashed var(--x-saffron); }
+      .x-flow > li.x-trig { border-left-color: var(--x-primary); background: #fff; } .x-trig .x-bhead { min-height: 44px; } .x-trig .x-bhead .x-tag { background: #E6F2EE; color: var(--x-primary); }
+      .x-sf { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+      .x-sf select, .x-sf input, .x-br > div > select { flex: 1; min-width: 120px; min-height: 44px; border: 1px solid var(--x-line); border-radius: 10px; padding: 0 10px; background: #fff; outline-color: var(--x-saffron); }
+      .x-sf input[type="number"] { flex: 0 1 90px; min-width: 70px; }
+      .x-br { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+      .x-br > div { display: grid; gap: 6px; align-content: start; padding: 8px; border: 1px dashed var(--x-line); border-radius: 10px; background: #fff; transition: background .2s, box-shadow .2s; }
+      .x-br .x-tag { justify-self: start; } .x-br > div + div .x-tag { background: #FBEFDD; color: var(--x-saffron-ink); } .x-br > div > select { width: 100%; box-sizing: border-box; }
+      .x-flow .is-run { background: #FBEFDD; box-shadow: 0 0 0 2px var(--x-saffron); }
+      @media (max-width: 600px) { .x-br { grid-template-columns: 1fr; } }
       @media (max-width: 600px) { .x-rule { grid-template-columns: 1fr 1fr; } }
       @media (max-width: 1100px) { .x-ed { grid-template-columns: 1fr; } .x-mail { position: static; } }
       @media (max-width: 1100px) { .x-s8, .x-s4 { grid-column: span 12; } .x-s2 { grid-column: span 4; } .x-checks { grid-template-columns: 1fr 1fr; } }
@@ -425,6 +442,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
           if (co) company = co.name; else state.companies.push({ name: company, domain: email.split("@")[1], industry: "—", city: "—" });
           state.contacts.unshift({ id: Date.now(), name, email, company, stage: d.stage, score: 10, owner: "Growth Monk", m: 0, acts: [["Contact created", 0]] });
           state.activity.unshift([`${name} from ${company} was added as ${d.stage}`, "CRM", "Just now"]); state.activity.length = 5;
+          fire("created", state.contacts[0]);
           Object.assign(ui, { q: "", stage: "", sort: "m", dir: 1, page: 0 }); $("#search").value = "";
           toast("Contact added.");
           if (cur() === "dashboard") render(); else refresh();
@@ -728,6 +746,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (co) company = co.name; else if (company !== "—") state.companies.push({ name: company, domain: email.split("@")[1] || "—", industry: "—", city: "—" });
         state.contacts.unshift({ id: Date.now(), name, email, company, stage: "Lead", score: 10, owner: "Growth Monk", m: 0, acts: [[`Submitted the ${fname} form`, 0], ["Contact created", 0]] });
         state.activity.unshift([`${esc(name)} submitted the ${esc(fname)} form`, "Form", "Just now"]); state.activity.length = 5;
+        fire("created", state.contacts[0]); fire("form", state.contacts[0], fname);
         f.subs++; f.views++;
         const s = state.forms.find((x) => x.id === f.id); if (s) Object.assign(s, { subs: f.subs, views: f.views });
         $("#fs").textContent = fstat(f); $("#fpw").innerHTML = prevHTML(f);
@@ -837,6 +856,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
           const id = Math.max(...state.tickets.map((t) => t.id)) + 1, at = Date.now();
           state.tickets.unshift({ id, cid: c.id, pri: d.pri, status: "New", ch: d.ch, owner: "Unassigned", at, subject, th: [{ k: "c", who: c.name, text, at }] });
           state.activity.unshift([`Ticket #${id} “${esc(subject)}” was created for ${esc(c.name)}`, "Help desk", "Just now"]); state.activity.length = 5;
+          fire("ticket", c, d.pri);
           toast("Ticket created.");
           if (["help-desk", "ticket-board"].includes(cur())) helpdesk($("#view"));
         });
@@ -948,6 +968,126 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (d.kq != null) { ui.kb.q = e.target.value; $("#kbl").innerHTML = kbList(); }
         else if (d.ke) { ui.kb.ed[d.ke] = e.target.value; kbPrev(); } });
       $("#view").addEventListener("keydown", (e) => { if (e.target.matches("[data-aid]") && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); kbOpen(+e.target.dataset.aid); } });
+      // Marketing: automations. A flow is a trigger plus steps; If/else steps hold one action per branch
+      const TRIG = { created: "Contact created", form: "Form submitted", stage: "Lifecycle stage changes to…", ticket: "Ticket created with priority…", seg: "Joins segment…" };
+      const tvals = (t) => ({ form: ["Any form", ...state.forms.map((f) => f.name)], stage: STAGES, ticket: PRI, seg: state.segs.map((s) => s.name) })[t];
+      const trigTxt = (f) => TRIG[f.trig.t].replace("…", "") + (tvals(f.trig.t) ? (f.trig.t === "form" ? " · " : " ") + f.trig.v : "");
+      const WS = { email: "Send email", wait: "Wait", if: "If/else branch", prop: "Update property", task: "Create task/ticket" }, BT = [["none", "Do nothing"], ["email", "Send email"], ["prop", "Update property"], ["task", "Create task/ticket"]];
+      const mk = (t) => ({ email: { t, camp: state.campaigns[0].id }, wait: { t, n: 2 }, if: { t, f: "Lead score", op: "greater than", v: "50", yes: { t: "none" }, no: { t: "none" } }, prop: { t, k: "stage", v: "MQL" }, task: { t, k: "Task", title: "Follow up with the contact" }, none: { t } })[t];
+      const pvals = (k) => (k === "stage" ? STAGES : [...AGENTS.slice(0, 4), "Growth Monk"]);
+      state.flows = [
+        { id: 1, name: "Welcome new leads", on: true, enrolled: 318, last: Date.now() - 12 * MIN, trig: { t: "created", v: "" }, steps: [{ t: "email", camp: 2 }, { t: "wait", n: 2 }, { t: "if", f: "Lead score", op: "greater than", v: "50", yes: { t: "prop", k: "stage", v: "MQL" }, no: { t: "task", k: "Task", title: "Call the new lead" } }] },
+        { id: 2, name: "Re-engage unengaged 30 days", on: false, enrolled: 46, last: Date.now() - 4320 * MIN, trig: { t: "seg", v: "Unengaged 30 days" }, steps: [{ t: "email", camp: 1 }, { t: "wait", n: 7 }, { t: "if", f: "Last activity", op: "less than", v: "7", yes: { t: "prop", k: "stage", v: "Lead" }, no: { t: "prop", k: "owner", v: "Meera" } }] },
+        { id: 3, name: "Route urgent tickets", on: true, enrolled: 27, last: Date.now() - 40 * MIN, trig: { t: "ticket", v: "Urgent" }, steps: [{ t: "prop", k: "owner", v: "Ananya" }, { t: "task", k: "Task", title: "Reply within 1 hour" }, { t: "if", f: "Lifecycle stage", op: "is", v: "Customer", yes: { t: "task", k: "Task", title: "Tell the account owner" }, no: { t: "none" } }] },
+      ];
+      ui.wlog = [];
+      const tog = (on, attr, name) => `<button class="x-tg" role="switch" aria-checked="${on}" ${attr} aria-label="${esc(name)} status"><i></i>${on ? "On" : "Off"}</button>`;
+      const act = (t) => { state.activity.unshift([esc(t), "Automation", "Just now"]); state.activity.length = 5; };
+      function exec(s, c, f, dry) {
+        const fn = f.name || "Untitled workflow", note = (t) => c.acts.unshift([`${t} · ${fn}`, 0]);
+        if (s.t === "email") { const m = state.campaigns.find((x) => x.id == s.camp)?.name || "a deleted campaign"; note(`Sent “${m}”`); return `Sent “${m}” to ${c.email}`; }
+        if (s.t === "wait") return `Wait ${s.n} ${s.n == 1 ? "day" : "days"}${dry ? ", skipped in test" : ""}`;
+        if (s.t === "prop") { const l = s.k === "stage" ? "Lifecycle stage" : "Owner", old = c[s.k]; c[s.k] = s.v; c.m = 0; note(`${l} changed to ${s.v}`); act(`${fn}: ${c.name}'s ${l.toLowerCase()} changed from ${old} to ${s.v}`); return `${l}: ${old} → ${s.v}`; }
+        if (s.t === "task") {
+          if (s.k === "Ticket") { const id = Math.max(...state.tickets.map((t) => t.id)) + 1, at = Date.now(); state.tickets.unshift({ id, cid: c.id, pri: "Medium", status: "New", ch: "Email", owner: "Unassigned", at, subject: s.title, th: [{ k: "e", text: `Created by ${fn}`, at }] }); act(`${fn} created ticket #${id} “${s.title}” for ${c.name}`); return `Created ticket #${id} “${s.title}”`; }
+          note(`Task: ${s.title}`); act(`${fn} created task “${s.title}” for ${c.name}`); return `Created task “${s.title}”`;
+        }
+        return "No action";
+      }
+      function fire(t, c, v) {
+        state.flows.filter((f) => f.on && f.trig.t === t && (!tvals(t) || f.trig.v === v || f.trig.v === "Any form")).forEach((f) => {
+          const done = [];
+          for (const s of f.steps) { if (s.t === "wait") { done.push(`now waiting ${s.n} ${s.n == 1 ? "day" : "days"}`); break; } done.push(exec(s.t === "if" ? s[test(c, s) ? "yes" : "no"] : s, c, f)); }
+          f.enrolled++; f.last = Date.now(); act(`“${f.name}” ran for ${c.name}: ${done.join("; ")}`);
+        });
+      }
+      function autos(v) { ui.flow ? flowEdit(v) : flowList(v); }
+      function flowList(v) {
+        v.innerHTML = `<div class="x-headrow"><div><h1>Automations</h1><p class="x-sub">${state.flows.length} workflows · ${state.flows.filter((f) => f.on).length} on. Click one to edit it.</p></div><button class="x-btn" data-wa="new">+ New workflow</button></div>
+          <div class="x-card"><div class="x-scroll">${table([
+            { label: "Workflow", render: (f) => `<span class="x-cn"><b>${esc(f.name)}</b><small>${f.steps.length} ${f.steps.length === 1 ? "step" : "steps"}</small></span>` },
+            { label: "Trigger", render: (f) => esc(trigTxt(f)) }, { label: "Status", render: (f) => tog(f.on, `data-wtg="${f.id}"`, f.name) },
+            { label: "Enrolled", render: (f) => f.enrolled.toLocaleString() }, { label: "Last run", cls: "x-when", render: (f) => (f.last ? ago(mins(f.last)) : "Never") }], state.flows, (f) => `class="x-click" data-flow="${f.id}" tabindex="0"`)}</div></div>`;
+      }
+      const so = (list, v) => list.map(([k, l]) => `<option value="${esc(k)}" ${k == v ? "selected" : ""}>${esc(l)}</option>`).join("");
+      function sf(s, p) {
+        const w = (k, html, lab) => `<select data-wp="${p}" data-wk="${k}" aria-label="${lab}">${html}</select>`, n = (k, val, lab, x) => `<input data-wp="${p}" data-wk="${k}" value="${esc(val)}" aria-label="${lab}" ${x} />`;
+        if (s.t === "none") return "";
+        return `<div class="x-sf">${s.t === "email" ? w("camp", so(state.campaigns.map((c) => [c.id, c.name]), s.camp), "Campaign")
+          : s.t === "wait" ? n("n", s.n, "Days to wait", 'type="number" min="1" max="90" inputmode="numeric"') + `<span class="x-muted">days</span>`
+          : s.t === "prop" ? w("k", so([["stage", "Lifecycle stage"], ["owner", "Owner"]], s.k), "Property") + w("v", opts(pvals(s.k), s.v), "New value")
+          : s.t === "task" ? w("k", opts(["Task", "Ticket"], s.k), "Create a task or ticket") + n("title", s.title, "Title", 'placeholder="Title"')
+          : w("f", opts(Object.keys(SF), s.f), "Contact field") + w("op", opts(SOP, s.op), "Operator") + n("v", s.v, "Value", 'placeholder="Value"')}</div>
+          ${s.t === "if" ? `<div class="x-br">${["yes", "no"].map((b) => `<div data-wb="${p}.${b}"><span class="x-tag">${b === "yes" ? "Yes" : "No"}</span><select data-wp="${p}.${b}" data-wk="t" aria-label="${b === "yes" ? "Yes" : "No"} branch action">${so(BT, s[b].t)}</select>${sf(s[b], `${p}.${b}`)}</div>`).join("")}</div>` : ""}`;
+      }
+      const drawLog = () => { const el = $("#wlog"); if (el) el.innerHTML = ui.wlog.map(([t, l]) => `<li><b>${esc(t)}</b><span>${l}</span></li>`).join(""); };
+      function flowEdit(v, focus) {
+        const f = ui.flow, last = f.steps.length - 1, tv = tvals(f.trig.t);
+        v.innerHTML = `<button class="x-sort x-muted" data-wa="back">← All workflows</button>
+          <div class="x-headrow"><div><h1 id="wh">${esc(f.name || "New workflow")}</h1><p class="x-sub">Build the flow top to bottom. ${plural(f.enrolled)} enrolled so far.</p></div>
+            <div class="x-row" style="margin:0">${tog(f.on, 'data-wa="tog"', f.name || "Workflow")}<button class="x-btn" data-wa="save">Save workflow</button></div></div>
+          <div class="x-ed"><div class="x-card">
+            <label class="x-fl">Workflow name<input data-wn value="${esc(f.name)}" placeholder="e.g. Nurture webinar signups" /></label>
+            <ol class="x-flow">
+              <li class="x-trig" id="ws-t"><div class="x-bhead"><span class="x-tag">Trigger</span></div><div class="x-sf"><select data-wt="t" aria-label="Trigger">${so(Object.entries(TRIG), f.trig.t)}</select>${tv ? `<select data-wt="v" aria-label="Trigger value">${opts(tv, f.trig.v)}</select>` : ""}</div></li>
+              ${f.steps.map((s, i) => `<li id="ws-${i}"><div class="x-bhead"><span class="x-tag">${i + 1}. ${WS[s.t]}</span><button class="x-ib" data-wa="up" data-i="${i}" ${i ? "" : "disabled"} aria-label="Move step ${i + 1} up">↑</button><button class="x-ib" data-wa="down" data-i="${i}" ${i < last ? "" : "disabled"} aria-label="Move step ${i + 1} down">↓</button><button class="x-ib" data-wa="del" data-i="${i}" aria-label="Delete step ${i + 1}">✕</button></div>${sf(s, i)}</li>`).join("")}
+            </ol>
+            <h2 style="margin-top:20px">Add a step</h2><div class="x-tools" id="wpal">${Object.entries(WS).map(([t, l]) => `<button class="x-btn x-btn--ghost" data-wa="add" data-t="${t}">+ ${l}</button>`).join("")}</div>
+          </div><div class="x-card x-mail"><div class="x-headrow"><div><h2>Test run</h2><p class="x-sub">${ui.wc ? `Sample contact: ${esc(ui.wc)}` : "Runs the flow on a random sample contact. Waits are skipped; other actions really happen."}</p></div><button class="x-btn" data-wa="test" ${ui.wrun ? "disabled" : ""}>Test run</button></div><ol class="x-tl" id="wlog" aria-live="polite"></ol></div></div>`;
+        drawLog();
+        if (focus) v.querySelector(focus)?.focus();
+      }
+      async function testRun() {
+        const f = ui.flow, c = state.contacts[Math.floor(Math.random() * state.contacts.length)], sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        Object.assign(ui, { wlog: [], wrun: true, wc: `${c.name} · ${c.stage} · score ${c.score}` }); flowEdit($("#view"), '[data-wa="test"]');
+        const log = (t, l, sel) => { ui.wlog.push([t, l]); drawLog(); document.querySelectorAll(".x-flow .is-run").forEach((x) => x.classList.remove("is-run")); if (sel && ui.flow === f) $(sel)?.classList.add("is-run"); };
+        log(`Enrolled ${c.name}: ${trigTxt(f)}`, "Trigger", "#ws-t");
+        for (const [i, s] of f.steps.entries()) {
+          await sleep(800);
+          if (s.t !== "if") { log(exec(s, c, f, true), `Step ${i + 1}`, `#ws-${i}`); continue; }
+          const ok = test(c, s), b = ok ? "yes" : "no";
+          log(`If ${s.f} ${s.op} ${s.v}: ${ok ? "Yes" : "No"}`, `Step ${i + 1}`, `#ws-${i}`); await sleep(800);
+          log(exec(s[b], c, f, true), `${ok ? "Yes" : "No"} branch`, `[data-wb="${i}.${b}"]`);
+        }
+        await sleep(600); log("Test run finished", "Done");
+        ui.wrun = false; const btn = $('[data-wa="test"]'); if (btn) btn.disabled = false;
+        toast(`Test run finished on ${c.name}.`);
+      }
+      const openFlow = (id) => { const f = state.flows.find((x) => x.id == id); if (f) { Object.assign(ui, { flow: structuredClone(f), wlog: [], wc: "" }); flowEdit($("#view")); $("#view").scrollTop = 0; } };
+      $("#view").addEventListener("click", (e) => {
+        if (cur() !== "automations") return;
+        const t = (s) => e.target.closest(s), a = t("[data-wa]"), tg = t("[data-wtg]"), row = t("tr[data-flow]"), v = $("#view"), f = ui.flow;
+        if (tg) { const x = state.flows.find((y) => y.id == tg.dataset.wtg); x.on = !x.on; flowList(v); $(`[data-wtg="${x.id}"]`).focus(); return toast(`“${x.name}” is ${x.on ? "on" : "off"}.`); }
+        if (row) return openFlow(row.dataset.flow);
+        if (!a || a.disabled) return;
+        const d = a.dataset, i = +d.i;
+        if (d.wa === "new") { Object.assign(ui, { flow: { id: 0, name: "", on: false, enrolled: 0, last: 0, trig: { t: "created", v: "" }, steps: [mk("email")] }, wlog: [], wc: "" }); flowEdit(v, "[data-wn]"); }
+        else if (d.wa === "back") { ui.flow = null; flowList(v); }
+        else if (d.wa === "tog") { f.on = !f.on; flowEdit(v, '[data-wa="tog"]'); }
+        else if (d.wa === "add") { f.steps.push(mk(d.t)); flowEdit(v, `#ws-${f.steps.length - 1} .x-sf > *, [data-wa="del"][data-i="${f.steps.length - 1}"]`); }
+        else if (d.wa === "del") { f.steps.splice(i, 1); flowEdit(v, "#wpal .x-btn"); }
+        else if (d.wa === "up" || d.wa === "down") { const j = d.wa === "up" ? i - 1 : i + 1; [f.steps[i], f.steps[j]] = [f.steps[j], f.steps[i]]; flowEdit(v, `[data-wa="${d.wa}"][data-i="${j}"]:not(:disabled), [data-wa="del"][data-i="${j}"]`); }
+        else if (d.wa === "test") { if (!f.steps.length) return toast("Add a step before testing."); testRun(); }
+        else if (d.wa === "save") {
+          if (!f.name.trim()) { toast("Name the workflow before saving."); return $("[data-wn]").focus(); }
+          f.name = f.name.trim(); const k = state.flows.findIndex((x) => x.id === f.id);
+          if (k >= 0) state.flows[k] = f; else state.flows.unshift(Object.assign(f, { id: Date.now() }));
+          ui.flow = null; flowList(v); toast(`Workflow “${f.name}” saved · ${f.on ? "On" : "Off"}.`);
+        }
+      });
+      $("#view").addEventListener("keydown", (e) => { if (e.target.matches("tr[data-flow]") && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openFlow(e.target.dataset.flow); } });
+      $("#view").addEventListener("input", (e) => {
+        const f = ui.flow, d = e.target.dataset, val = e.target.value, v = $("#view");
+        if (!f || cur() !== "automations") return;
+        if (d.wn != null) { f.name = val; $("#wh").textContent = val || "New workflow"; }
+        else if (d.wt) { f.trig[d.wt] = val; if (d.wt === "t") { f.trig.v = tvals(val)?.[0] || ""; flowEdit(v, '[data-wt="t"]'); } }
+        else if (d.wp) {
+          const [p0, p1] = d.wp.split("."), s = p1 ? f.steps[p0][p1] : f.steps[p0], sel = `[data-wp="${d.wp}"][data-wk="${d.wk}"]`;
+          if (d.wk === "t") { f.steps[p0][p1] = mk(val); return flowEdit(v, sel); }
+          s[d.wk] = d.wk === "n" ? Math.max(1, Math.round(+val) || 1) : d.wk === "camp" ? +val : val;
+          if (d.wk === "k" && s.t === "prop") { s.v = pvals(val)[0]; flowEdit(v, sel); }
+        }
+      });
       // Settings: account, users, lifecycle stages (shared STAGES), SLA targets (shared SLAH), billing
       Object.assign(state, { co: "Growth Monk", tz: "Asia/Kolkata (UTC+05:30)", cur: "INR" });
       const ROLES = ["Admin", "Agent", "Marketer"], TZS = ["Asia/Kolkata (UTC+05:30)", "Asia/Singapore (UTC+08:00)", "Asia/Dubai (UTC+04:00)", "Europe/London (UTC+00:00)", "America/New_York (UTC−05:00)"];
@@ -1048,7 +1188,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         }
       });
       $("#view").addEventListener("keydown", (e) => { if (e.target.id === "sadd" && e.key === "Enter") $('[data-st="stage"]').click(); });
-      const routes = { dashboard, contacts, companies, segments, campaigns, forms, settings, "help-desk": helpdesk, "knowledge-base": kb, "ticket-board": (v) => { ui.tk.view = "board"; helpdesk(v); } };
+      const routes = { dashboard, contacts, companies, segments, campaigns, forms, settings, "help-desk": helpdesk, "knowledge-base": kb, automations: autos, "ticket-board": (v) => { ui.tk.view = "board"; helpdesk(v); } };
       NAV.forEach(([, items]) => items.forEach(([id, label]) => { if (!routes[id]) routes[id] = empty(label); }));
 
       function render() {
@@ -1057,6 +1197,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (view !== "campaigns") ui.camp = null;
         if (view !== "segments") ui.seg = null;
         if (view !== "forms") ui.form = null;
+        if (view !== "automations") ui.flow = null;
         if (view !== "knowledge-base") ui.kb.mode = "list";
         $("#nav").innerHTML = NAV.map(([group, items]) => (group ? `<h4>${group}</h4>` : "") + items.map(([i, l, ic]) => `<a href="#/${i}" class="${i === view ? "is-on" : ""}" ${i === view ? 'aria-current="page"' : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[ic]}"/></svg>${l}</a>`).join("")).join("");
         routes[view]($("#view"));
