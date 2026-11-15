@@ -119,6 +119,7 @@
       .x-av--lg { width: 48px; height: 48px; font-size: 16px; flex: none; }
       .x-dl { display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; margin: 0 0 22px; align-items: center; } .x-dl dt { color: var(--x-muted); font-size: 13px; font-weight: 600; } .x-dl dd { margin: 0; }
       .x-drawer h3 { font: 600 15px var(--x-head); margin: 0 0 10px; }
+      .x-del { margin-top: 20px; width: 100%; color: #B42318 !important; }
       .x-notef { display: grid; gap: 8px; margin-bottom: 16px; } .x-notef textarea { padding: 10px 12px; resize: vertical; } .x-notef .x-btn { justify-self: end; }
       .x-tl { list-style: none; margin: 0; padding: 0 0 0 16px; border-left: 2px solid var(--x-line); display: grid; gap: 14px; }
       .x-tl li { position: relative; } .x-tl li::before { content: ""; position: absolute; left: -22px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--x-chart); border: 2px solid #fff; }
@@ -275,7 +276,7 @@
               <button class="x-icon x-menu" id="menu" aria-label="Open menu">☰</button>
               <div class="x-sw"><input class="x-search" type="search" placeholder="Search contacts…" aria-label="Search contacts" id="search" autocomplete="off" aria-controls="sdrop" /><ul class="x-drop" id="sdrop" hidden></ul></div>
               <span class="x-ws">Workspace <b id="ws">Growth Monk</b></span>
-              <span class="x-pill">Prototype · sample data</span>
+              <span class="x-pill" id="mode">Demo mode · data resets on reload</span>
               <button class="x-btn" id="create">+ Create</button>
               <button class="x-icon" id="bell" aria-label="Notifications"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg><i></i></button>
             </header>
@@ -288,6 +289,21 @@
     <script src="chart.js"></script>
     <script src="datalabels.js"></script>
     <script src="hark-charts.js"></script>
+    <script src="config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      // Supabase client: only when both config values are set and the library loaded; never breaks the app
+      window.gmSupabase = null;
+      try {
+        const cfg = window.GM_CONFIG || {};
+        if (cfg.supabaseUrl && cfg.supabaseAnonKey && window.supabase && typeof window.supabase.createClient === "function") {
+          window.gmSupabase = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+        }
+      } catch (err) {
+        console.warn("GrowthMonk: Supabase not started, running in demo mode.", err);
+        window.gmSupabase = null;
+      }
+    </script>
     <script>
       const $ = (s) => document.querySelector(s);
       const ICON = {
@@ -346,12 +362,52 @@ Nikhil Verma|10|Subscriber|27|Vikram|8640
 Marco Ruiz|11|Customer|86|Ananya|180
 Sofia Hernández|11|Lead|41|Ananya|3600`;
       const ACTS = ["Submitted the Demo request form", "Opened “October product update”", "Replied to a sales email", "Visited the pricing page", "Booked a discovery call", "Rated a support chat 5 out of 5"];
-      state.companies = CO.map(([name, domain, industry, city]) => ({ name, domain, industry, city }));
+      state.companies = CO.map(([name, domain, industry, city], i) => ({ id: i + 1, name, domain, industry, city }));
       state.contacts = PEOPLE.split("\n").map((l, i) => {
         const [name, c, stage, score, owner, m] = l.split("|"), co = CO[c];
         return { id: i + 1, name, email: name.split(" ")[0].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() + "@" + co[1], company: co[0], stage, score: +score, owner, m: +m,
           acts: [[ACTS[i % ACTS.length], +m], [`Moved to ${stage}`, +m + 1440], ["Contact created", +m + 20160]] };
       });
+      // Data layer for contacts and companies: in-memory sample arrays in demo mode, Supabase when configured
+      const db = (() => {
+        const TABLES = ["contacts", "companies"];
+        const sb = () => window.gmSupabase || null;
+        const check = (t) => { if (!TABLES.includes(t)) throw new Error(`db: unknown table "${t}"`); };
+        const ws = () => window.gmWorkspaceId;
+        const fail = (error) => { if (error) throw error; };
+        return {
+          get demo() { return !sb(); },
+          async list(table) {
+            check(table);
+            if (!sb()) return state[table];
+            const { data, error } = await sb().from(table).select("*").eq("workspace_id", ws()); fail(error);
+            return data || [];
+          },
+          async create(table, row) {
+            check(table);
+            if (!sb()) { const r = { id: row.id ?? Date.now(), ...row }; if (table === "contacts") state[table].unshift(r); else state[table].push(r); return r; }
+            const { id, ...rest } = row;
+            const { data, error } = await sb().from(table).insert({ ...rest, workspace_id: ws() }).select().single(); fail(error);
+            return data;
+          },
+          async update(table, id, patch) {
+            check(table);
+            if (!sb()) { const r = state[table].find((x) => x.id == id); if (!r) throw new Error("Record not found."); return Object.assign(r, patch); }
+            const { data, error } = await sb().from(table).update(patch).eq("id", id).eq("workspace_id", ws()).select().single(); fail(error);
+            return data;
+          },
+          async remove(table, id) {
+            check(table);
+            if (!sb()) { const i = state[table].findIndex((x) => x.id == id); if (i >= 0) state[table].splice(i, 1); return true; }
+            const { error } = await sb().from(table).delete().eq("id", id).eq("workspace_id", ws()); fail(error);
+            return true;
+          },
+        };
+      })();
+      // Fill gaps in rows from Supabase so every screen can render them
+      const normContact = (r) => ({ score: 0, owner: "Growth Monk", stage: "Lead", company: "—", email: "", name: "", m: 0, acts: [], ...r });
+      const normCompany = (r) => ({ domain: "—", industry: "—", city: "—", name: "", ...r });
+      const dbErr = (err) => { console.warn("GrowthMonk db:", err); toast(`Couldn't save: ${err?.message || "please try again."}`); };
       const ui = { q: "", stage: "", sort: "m", dir: 1, page: 0 };
       let charts = [];
 
@@ -439,21 +495,35 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
               <button class="x-btn x-btn--ghost" data-page="${ui.page + 1}" ${ui.page < pages - 1 ? "" : "disabled"} aria-label="Next page">›</button></div></div>`
           : `<p class="x-sub" style="text-align:center;margin:32px 0">No contacts match. Try another search or stage.</p>`;
       }
-      function contacts(v) {
+      // Load contacts and companies through db; in demo mode the lists are the sample arrays themselves
+      let pulling = false;
+      async function pull() {
+        if (pulling) return; pulling = true;
+        try {
+          const [cs, cos] = await Promise.all([db.list("contacts"), db.list("companies")]);
+          if (cs !== state.contacts) state.contacts.splice(0, state.contacts.length, ...cs.map(normContact));
+          if (cos !== state.companies) state.companies.splice(0, state.companies.length, ...cos.map(normCompany));
+          if (!db.demo) refresh();
+        } catch (err) { console.warn("GrowthMonk db:", err); toast("Couldn't load from the database. Showing the last data loaded."); }
+        finally { pulling = false; }
+      }
+      function contacts(v) { contactsView(v); pull(); }
+      function contactsView(v) {
         v.innerHTML = `<div class="x-headrow"><div><h1>Contacts</h1><p class="x-sub">${state.contacts.length} people across ${state.companies.length} companies. Click a row for details.</p></div><button class="x-btn" data-add>+ Add contact</button></div>
           <div class="x-card"><div class="x-tools"><input type="search" id="cq" placeholder="Search name, email or company" aria-label="Search contacts" value="${esc(ui.q)}" />
             <select id="cs" aria-label="Filter by stage"><option value="">All stages</option>${STAGES.map((s) => `<option ${s === ui.stage ? "selected" : ""}>${s}</option>`).join("")}</select></div><div id="ct"></div></div>`;
         renderContacts();
       }
       // CRM: companies, derived from contacts
-      function companies(v) {
+      function companies(v) { companiesView(v); pull(); }
+      function companiesView(v) {
         const rows = state.companies.map((c) => ({ ...c, n: state.contacts.filter((p) => p.company === c.name).length })).sort((a, b) => a.name.localeCompare(b.name));
         v.innerHTML = `<h1>Companies</h1><p class="x-sub">${rows.length} companies, derived from your contacts.</p><div class="x-card"><div class="x-scroll">${table([
           { label: "Name", render: (r) => person(r.name) }, { label: "Domain", render: (r) => `<span class="x-muted">${esc(r.domain)}</span>` }, { label: "Industry", render: (r) => esc(r.industry) },
           { label: "City", render: (r) => esc(r.city) }, { label: "Contacts", render: (r) => `<a class="x-tag" href="#/contacts" data-co="${esc(r.name)}">${r.n} ${r.n === 1 ? "contact" : "contacts"}</a>` }], rows)}</div></div>`;
       }
       const cur = () => location.hash.slice(2) || "dashboard";
-      const refresh = () => { if (["contacts", "companies"].includes(cur())) routes[cur()]($("#view")); };
+      const refresh = () => { const views = { contacts: contactsView, companies: companiesView }; if (views[cur()]) views[cur()]($("#view")); };
       function addContact() {
         modal("Add contact", `<label>Name<input name="name" required placeholder="e.g. Priya Sharma" /></label><label>Email<input name="email" type="email" required placeholder="name@company.com" /></label>
           <label>Company<input name="company" list="x-cos" required placeholder="e.g. Bloom Organics" /><datalist id="x-cos">${state.companies.map((c) => `<option value="${esc(c.name)}">`).join("")}</datalist></label>
@@ -465,13 +535,17 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
           if (!company) return "Enter a company.";
           if (state.contacts.some((c) => c.email === email)) return "A contact with this email already exists.";
           const co = state.companies.find((c) => c.name.toLowerCase() === company.toLowerCase());
-          if (co) company = co.name; else state.companies.push({ name: company, domain: email.split("@")[1], industry: "—", city: "—" });
-          state.contacts.unshift({ id: Date.now(), name, email, company, stage: d.stage, score: 10, owner: "Growth Monk", m: 0, acts: [["Contact created", 0]] });
-          state.activity.unshift([`${name} from ${company} was added as ${d.stage}`, "CRM", "Just now"]); state.activity.length = 5;
-          fire("created", state.contacts[0]);
-          Object.assign(ui, { q: "", stage: "", sort: "m", dir: 1, page: 0 }); $("#search").value = "";
-          toast("Contact added.");
-          if (cur() === "dashboard") render(); else refresh();
+          (async () => {
+            if (co) company = co.name;
+            else { const nc = await db.create("companies", { name: company, domain: email.split("@")[1], industry: "—", city: "—" }); if (!db.demo) state.companies.push(normCompany(nc)); }
+            const made = await db.create("contacts", { id: Date.now(), name, email, company, stage: d.stage, score: 10, owner: "Growth Monk", m: 0, acts: [["Contact created", 0]] });
+            if (!db.demo) state.contacts.unshift(normContact(made));
+            state.activity.unshift([`${name} from ${company} was added as ${d.stage}`, "CRM", "Just now"]); state.activity.length = 5;
+            fire("created", state.contacts[0]);
+            Object.assign(ui, { q: "", stage: "", sort: "m", dir: 1, page: 0 }); $("#search").value = "";
+            toast("Contact added.");
+            if (cur() === "dashboard") render(); else refresh();
+          })().catch(dbErr);
         });
       }
       // Contact drawer
@@ -487,12 +561,24 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
           <dl class="x-dl"><dt>Company</dt><dd>${esc(c.company)}</dd><dt>Owner</dt><dd>${esc(c.owner)}</dd><dt>Lead score</dt><dd>${scoreBar(c.score)}</dd><dt>Last activity</dt><dd>${ago(c.m)}</dd>
             <dt><label for="ds">Lifecycle stage</label></dt><dd><select id="ds">${STAGES.map((s) => `<option ${s === c.stage ? "selected" : ""}>${s}</option>`).join("")}</select></dd></dl>
           <h3>Activity</h3><form class="x-notef"><textarea name="note" rows="3" placeholder="Add a note…" aria-label="Note"></textarea><button class="x-btn">Add note</button></form>
-          <ol class="x-tl">${c.acts.map(([t, m]) => `<li><b>${esc(t)}</b><span>${ago(m)}</span></li>`).join("")}</ol></aside>`; };
-        const touch = (act, msg, focus) => { c.acts.unshift([act, 0]); c.m = 0; draw(); el.querySelector(focus).focus(); if ($("#ct")) renderContacts(); if ($("#sgp")) segPrev(); toast(msg); };
+          <ol class="x-tl">${c.acts.map(([t, m]) => `<li><b>${esc(t)}</b><span>${ago(m)}</span></li>`).join("")}</ol>
+          <button type="button" class="x-btn x-btn--ghost x-del" data-del>Delete contact</button></aside>`; };
+        const touch = (patch, act, msg, focus) => db.update("contacts", c.id, { ...patch, acts: [[act, 0], ...c.acts], m: 0 }).then((r) => {
+          if (r && r !== c) Object.assign(c, normContact(r));
+          draw(); el.querySelector(focus).focus(); if ($("#ct")) renderContacts(); if ($("#sgp")) segPrev(); toast(msg);
+        }).catch((err) => { draw(); dbErr(err); });
         draw();
-        el.addEventListener("click", (e) => { if (e.target === el || e.target.closest("[data-x]")) closeDrawer(); });
-        el.addEventListener("change", (e) => { if (e.target.id === "ds") { c.stage = e.target.value; touch(`Stage changed to ${c.stage}`, `${c.name} moved to ${c.stage}`, "#ds"); } });
-        el.addEventListener("submit", (e) => { e.preventDefault(); const t = e.target.note.value.trim(); if (!t) return e.target.note.focus(); touch(`Note: ${t}`, "Note added.", "textarea"); });
+        el.addEventListener("click", (e) => {
+          if (e.target === el || e.target.closest("[data-x]")) closeDrawer();
+          else if (e.target.closest("[data-del]") && confirm(`Delete ${c.name}? This can't be undone.`)) {
+            db.remove("contacts", c.id).then(() => {
+              if (!db.demo) { const i = state.contacts.indexOf(c); if (i >= 0) state.contacts.splice(i, 1); }
+              closeDrawer(); refresh(); if ($("#sgp")) segPrev(); toast(`${c.name} deleted.`);
+            }).catch(dbErr);
+          }
+        });
+        el.addEventListener("change", (e) => { if (e.target.id === "ds") { const s = e.target.value; touch({ stage: s }, `Stage changed to ${s}`, `${c.name} moved to ${s}`, "#ds"); } });
+        el.addEventListener("submit", (e) => { e.preventDefault(); const t = e.target.note.value.trim(); if (!t) return e.target.note.focus(); touch({}, `Note: ${t}`, "Note added.", "textarea"); });
         document.body.appendChild(el);
         el.querySelector("[data-x]").focus();
       }
@@ -1493,6 +1579,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       document.addEventListener("keydown", (e) => { if (e.key === "Escape") { $("#sdrop").hidden = true; closeDrawer(); } });
       $("#menu").addEventListener("click", () => $("#app").classList.toggle("is-open"));
       $("#app").addEventListener("click", (e) => { if (e.target === $("#app")) $("#app").classList.remove("is-open"); });
+      if (!db.demo) { $("#mode").remove(); $("#create").style.marginLeft = "auto"; }
       render();
     </script>
   </body>
