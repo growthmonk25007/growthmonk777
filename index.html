@@ -152,6 +152,23 @@
       .x-pform [aria-invalid="true"] { border-color: #B42318; }
       .x-rq { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 8px; font-size: 13px; font-weight: 600; cursor: pointer; } .x-rq input { width: 18px; height: 18px; accent-color: var(--x-saffron); }
       .x-tools .x-tab[aria-pressed="true"] { border-color: var(--x-saffron); background: #FBEFDD; color: var(--x-saffron-ink) !important; }
+      .x-lpd { margin-inline: auto; max-width: 100%; border: 1px solid var(--x-line); border-radius: 12px; overflow: hidden; transition: max-width .2s; }
+      .x-lpd[data-d="mobile"] { max-width: 375px; border: 8px solid var(--x-ink); border-radius: 28px; }
+      .x-lp { background: #fff; color: var(--x-ink); font: 500 15px/1.6 var(--x-ui); } .x-lp > * { margin: 0; padding: 28px 24px; }
+      .x-lp button, .x-lp input, .x-lp select { font: inherit; color: inherit; }
+      .x-lph { text-align: center; background: linear-gradient(180deg, #FBEFDD, #fff); border-top: 4px solid var(--x-saffron); }
+      .x-lph h1 { font: 700 30px/1.2 var(--x-head); margin: 0 0 10px; overflow-wrap: anywhere; } .x-lph p { color: var(--x-muted); margin: 0 auto 18px; max-width: 52ch; }
+      .x-lp .x-ebtn { background: var(--x-primary); color: #fff; border: 0; min-height: 44px; font-weight: 700; cursor: pointer; } .x-lp .x-ebtn:hover { background: var(--x-side); }
+      .x-lpf { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+      .x-lpf div { background: var(--x-bg); border-top: 3px solid var(--x-saffron); border-radius: 10px; padding: 14px; overflow-wrap: anywhere; } .x-lpf b { display: block; font: 600 15px/1.3 var(--x-head); margin-bottom: 4px; } .x-lpf span { color: var(--x-muted); font-size: 14px; }
+      .x-lp .x-pform { max-width: 480px; margin-inline: auto; }
+      .x-lpq { text-align: center; } .x-lpq blockquote { margin: 0 auto 8px; max-width: 46ch; font: 600 18px/1.5 var(--x-head); } .x-lpq blockquote::before { content: "“"; display: block; color: var(--x-saffron); font-size: 40px; line-height: .8; }
+      .x-lpq figcaption { color: var(--x-muted); font-size: 14px; } .x-lpft { background: var(--x-side); color: #D5E3DF; font-size: 13px; text-align: center; padding: 18px 24px !important; }
+      .x-lpd[data-d="mobile"] .x-lpf { grid-template-columns: 1fr; } .x-lpd[data-d="mobile"] .x-lph h1 { font-size: 24px; }
+      .x-lpo { position: fixed; inset: 0; z-index: 25; background: #fff; overflow-y: auto; }
+      .x-lpbar { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 16px; background: var(--x-bg); border-bottom: 1px solid var(--x-line); font: 13px "Geist Mono", monospace; color: var(--x-muted); }
+      .x-lpbar .x-btn { font: 700 14px var(--x-ui); } .x-lpo .x-lp > * { padding: 56px max(24px, calc(50% - 480px)); } .x-lpo .x-lph h1 { font-size: 42px; }
+      @media (max-width: 700px) { .x-lpo .x-lpf { grid-template-columns: 1fr; } .x-lpo .x-lph h1 { font-size: 28px; } .x-lpo .x-lp > * { padding: 36px 20px; } }
       .x-code { background: var(--x-ink); color: #E6F2EE; padding: 16px; border-radius: 10px; overflow-x: auto; font: 13px/1.6 "Geist Mono", monospace; margin: 0 0 12px; white-space: pre; }
       /* Help desk · Service Lagoon accent */
       :root { --x-lagoon: #1E7FA8; --x-lagoon-ink: #155E7D; --x-lagoon-wash: #E3F1F7; }
@@ -681,10 +698,10 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
             { label: "Submissions", render: (r) => r.subs.toLocaleString() },
             { label: "Conversion", render: conv }], state.forms, (r) => `class="x-click" data-form="${r.id}" tabindex="0"`)}</div></div>`;
       }
-      const prevHTML = (f) => `<form class="x-email x-pform" id="fprev" novalidate><h3>${esc(f.name || "Untitled form")}</h3>${f.fields.map((x, i) => {
-          const a = `name="f${i}" aria-describedby="pe${i}" ${x.req ? 'aria-required="true"' : ""}`, l = `${esc(x.label || FT[x.t][0])}${x.req ? '<i class="x-req" aria-hidden="true"> *</i>' : ""}`;
+      const prevHTML = (f, p = "") => `<form class="x-email x-pform" id="${p}fprev" data-fid="${f.id}" novalidate><h3>${esc(f.name || "Untitled form")}</h3>${f.fields.map((x, i) => {
+          const a = `name="f${i}" aria-describedby="${p}pe${i}" ${x.req ? 'aria-required="true"' : ""}`, l = `${esc(x.label || FT[x.t][0])}${x.req ? '<i class="x-req" aria-hidden="true"> *</i>' : ""}`;
           return (x.t === "check" ? `<label class="x-fl x-fl--check"><input type="checkbox" ${a} /><b>${l}</b></label>`
-            : `<label class="x-fl"><b>${l}</b>${x.t === "select" ? `<select ${a}><option value="">Choose…</option>${x.opts.split(",").map((o) => o.trim()).filter(Boolean).map((o) => `<option>${esc(o)}</option>`).join("")}</select>` : `<input type="${FT[x.t][1]}" ${a} />`}</label>`) + `<p class="x-err" id="pe${i}" hidden></p>`;
+            : `<label class="x-fl"><b>${l}</b>${x.t === "select" ? `<select ${a}><option value="">Choose…</option>${x.opts.split(",").map((o) => o.trim()).filter(Boolean).map((o) => `<option>${esc(o)}</option>`).join("")}</select>` : `<input type="${FT[x.t][1]}" ${a} />`}</label>`) + `<p class="x-err" id="${p}pe${i}" hidden></p>`;
         }).join("") || `<p class="x-muted">Add a field to start your form.</p>`}<button class="x-ebtn">Submit</button><p class="x-efoot">Powered by GrowthMonk · We never share your details.</p></form>`;
       function formEdit(v, focus) {
         const f = ui.form, last = f.fields.length - 1;
@@ -727,18 +744,16 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         else return;
         $("#fpw").innerHTML = prevHTML(f);
       });
-      $("#view").addEventListener("submit", (e) => {
-        if (e.target.id !== "fprev") return;
-        e.preventDefault();
-        const f = ui.form, el = e.target.elements;
+      function submitForm(form, f, pre = "") {
+        const el = form.elements;
         let bad = null;
         f.fields.forEach((x, i) => {
-          const inp = el["f" + i], v = x.t === "check" ? inp.checked : inp.value.trim(), p = $("#pe" + i);
+          const inp = el["f" + i], v = x.t === "check" ? inp.checked : inp.value.trim(), p = form.querySelector(`#${pre}pe${i}`);
           const msg = x.req && !v ? (x.t === "check" ? "Please tick this box." : "This field is required.") : x.t === "email" && v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "Enter a valid email address." : "";
           p.textContent = msg; p.hidden = !msg; inp.setAttribute("aria-invalid", !!msg);
           if (msg && !bad) bad = inp;
         });
-        if (bad) return bad.focus();
+        if (bad) { bad.focus(); return false; }
         const get = (t, re) => { const k = f.fields.findIndex((x) => x.t === t && (!re || re.test(x.label))); return k < 0 ? "" : el["f" + k].value.trim(); };
         const email = get("email").toLowerCase(), name = get("text", /name/i) || get("text") || email.split("@")[0] || "New lead", fname = f.name || "Untitled form";
         let company = get("text", /company|organi/i) || "—";
@@ -748,9 +763,128 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         state.activity.unshift([`${esc(name)} submitted the ${esc(fname)} form`, "Form", "Just now"]); state.activity.length = 5;
         fire("created", state.contacts[0]); fire("form", state.contacts[0], fname);
         f.subs++; f.views++;
-        const s = state.forms.find((x) => x.id === f.id); if (s) Object.assign(s, { subs: f.subs, views: f.views });
+        const s = state.forms.find((x) => x.id === f.id); if (s && s !== f) Object.assign(s, { subs: f.subs, views: f.views });
+        return true;
+      }
+      $("#view").addEventListener("submit", (e) => {
+        if (e.target.id !== "fprev") return;
+        e.preventDefault();
+        const f = ui.form;
+        if (!submitForm(e.target, f)) return;
         $("#fs").textContent = fstat(f); $("#fpw").innerHTML = prevHTML(f);
         toast("Submission received. Contact created.");
+      });
+      // Marketing: landing pages. SEC: type → [label, defaults, editable fields]
+      const SEC = {
+        hero: ["Hero", { h: "Your headline here", p: "One or two lines on why it matters.", b: "Get started" }, [["h", "Headline"], ["p", "Subtext"], ["b", "Button label"]]],
+        features: ["Features", { a1: "Feature one", d1: "What it does for you.", a2: "Feature two", d2: "What it does for you.", a3: "Feature three", d3: "What it does for you." }, [1, 2, 3].flatMap((n) => [[`a${n}`, `Feature ${n} title`], [`d${n}`, `Feature ${n} text`]])],
+        form: ["Form", { form: 1 }, []],
+        testi: ["Testimonial", { q: "GrowthMonk paid for itself in the first month.", who: "Customer name, Company" }, [["q", "Quote"], ["who", "Name and company"]]],
+        footer: ["Footer", { text: "© 2025 GrowthMonk · Privacy · Terms" }, [["text", "Footer text"]]],
+      };
+      const sec = (t, o) => ({ t, ...SEC[t][1], ...o });
+      state.lps = [
+        { id: 1, name: "Free CRM demo", slug: "free-crm-demo", status: "Published", views: 3240, subs: 286, secs: [sec("hero", { h: "See GrowthMonk CRM in 20 minutes", p: "A free, live walkthrough for growing teams. No card needed.", b: "Book my free demo" }), sec("features", { a1: "One inbox", d1: "Email, chat and forms in one place.", a2: "Smart pipelines", d2: "Deals move as leads engage.", a3: "GST-ready billing", d3: "Invoices your accountant will like." }), sec("form", { form: 1 }), sec("testi", { q: "We replaced three tools and closed more deals in one quarter.", who: "Priya Sharma, Bloom Organics" }), sec("footer")] },
+        { id: 2, name: "Diwali offer", slug: "diwali-offer", status: "Published", views: 5810, subs: 742, secs: [sec("hero", { h: "Diwali offer: 40% off Pro for a year", p: "Light up your growth this festive season.", b: "Claim my offer" }), sec("form", { form: 3 }), sec("footer")] },
+        { id: 3, name: "Webinar signup", slug: "webinar-signup", status: "Draft", views: 0, subs: 0, secs: [sec("hero", { h: "Webinar: automate your follow-ups", p: "45 minutes with live Q&A from our team.", b: "Save my seat" }), sec("features", { a1: "Lead scoring", d1: "Know who is ready to buy.", a2: "Auto follow-ups", d2: "Emails that send themselves.", a3: "Ready workflows", d3: "Start from proven templates." }), sec("form", { form: 2 }), sec("footer")] },
+      ];
+      ui.lpdev = "desktop";
+      const lslug = (t) => t.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+      const slugErr = (p) => (!p.slug ? "Add a URL slug." : !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(p.slug) ? "Use lowercase letters, numbers and single hyphens." : p.slug.length > 60 ? "Keep it under 60 characters." : state.lps.some((x) => x.id !== p.id && x.slug === p.slug) ? "Another page already uses this slug." : "");
+      const lpStat = (p) => `${chip(p.status)} · ${p.views.toLocaleString()} views · ${p.subs.toLocaleString()} submissions · ${conv(p)} conversion`;
+      const secHTML = (s, pre) => ({
+        hero: () => `<header class="x-lph"><h1>${esc(s.h)}</h1><p>${esc(s.p)}</p><button type="button" class="x-ebtn" data-lpgo>${esc(s.b)}</button></header>`,
+        features: () => `<section class="x-lpf">${[1, 2, 3].map((n) => `<div><b>${esc(s["a" + n])}</b><span>${esc(s["d" + n])}</span></div>`).join("")}</section>`,
+        form: () => `<section>${prevHTML(state.forms.find((f) => f.id == s.form) || state.forms[0], pre)}</section>`,
+        testi: () => `<figure class="x-lpq"><blockquote>${esc(s.q)}</blockquote><figcaption>${esc(s.who)}</figcaption></figure>`,
+        footer: () => `<footer class="x-lpft">${esc(s.text)}</footer>`,
+      })[s.t]();
+      const lpHTML = (p, pre) => p.secs.map((s, i) => secHTML(s, pre + i)).join("") || `<p class="x-muted" style="text-align:center">Add a section to start your page.</p>`;
+      function landing(v) { ui.lp ? lpEdit(v) : lpList(v); }
+      function lpList(v) {
+        v.innerHTML = `<div class="x-headrow"><div><h1>Landing pages</h1><p class="x-sub">${state.lps.length} pages · ${state.lps.filter((p) => p.status === "Published").length} published. Click one to edit it.</p></div><button class="x-btn" data-lact="new">+ New landing page</button></div>
+          <div class="x-card"><div class="x-scroll">${table([
+            { label: "Page", render: (r) => `<b>${esc(r.name)}</b>` },
+            { label: "Status", render: (r) => chip(r.status) },
+            { label: "URL slug", render: (r) => `<span class="x-muted">/p/${esc(r.slug)}</span>` },
+            { label: "Views", render: (r) => r.views.toLocaleString() },
+            { label: "Submissions", render: (r) => r.subs.toLocaleString() },
+            { label: "Conversion", render: conv }], state.lps, (r) => `class="x-click" data-lp="${r.id}" tabindex="0"`)}</div></div>`;
+      }
+      function lpEdit(v, focus) {
+        const p = ui.lp, last = p.secs.length - 1, ib = (act, i, l, ch, off) => `<button class="x-ib" data-lact="${act}" data-i="${i}" ${off ? "disabled" : ""} aria-label="${l}">${ch}</button>`;
+        v.innerHTML = `<button class="x-sort x-muted" data-lact="back">← All landing pages</button>
+          <div class="x-headrow"><div><h1 id="lph">${esc(p.name || "New landing page")}</h1><p class="x-sub" id="lps">${lpStat(p)}</p></div>
+            <div class="x-tools"><button class="x-btn x-btn--ghost" data-lact="live">View live</button><button class="x-btn x-btn--ghost" data-lact="draft">Save draft</button><button class="x-btn" data-lact="pub">Publish</button></div></div>
+          <div class="x-ed" style="margin-top:4px"><div class="x-card">
+            <label class="x-fl">Page title<input data-lt value="${esc(p.name)}" placeholder="e.g. Free CRM demo" /></label>
+            <label class="x-fl">URL slug<input data-lsl value="${esc(p.slug)}" placeholder="e.g. free-crm-demo" aria-describedby="lpe" spellcheck="false" autocomplete="off" /></label>
+            <p class="x-err" id="lpe" role="alert" style="margin-top:-6px" hidden></p>
+            <h2>Sections</h2>
+            <ol class="x-blocks">${p.secs.map((s, i) => `<li><div class="x-bhead"><span class="x-tag">${SEC[s.t][0]}</span>${ib("up", i, "Move up", "↑", !i)}${ib("down", i, "Move down", "↓", i === last)}${ib("del", i, "Delete section", "✕")}</div>
+              ${s.t === "form" ? `<label class="x-fl" style="margin:0">Form from the Forms screen<select data-ls="${i}" data-lk="form">${state.forms.map((f) => `<option value="${f.id}" ${f.id == s.form ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></label>`
+              : SEC[s.t][2].map(([k, l], j) => `<input data-ls="${i}" data-lk="${k}" value="${esc(s[k])}" aria-label="${SEC[s.t][0]}: ${l}" placeholder="${l}" ${j ? 'style="margin-top:6px"' : ""} />`).join("")}</li>`).join("")}</ol>
+            <div class="x-tools">${Object.entries(SEC).map(([t, [l]]) => `<button class="x-btn x-btn--ghost" data-lact="add" data-t="${t}">+ ${l}</button>`).join("")}</div>
+          </div><div class="x-card x-mail"><div class="x-headrow"><div><h2>Live preview</h2><p class="x-sub" id="lpu">growthmonk.app/p/${esc(p.slug || "…")}</p></div>
+            <div class="x-tools">${[["desktop", "Desktop"], ["mobile", "Mobile"]].map(([k, l]) => `<button class="x-btn x-btn--ghost x-tab" aria-pressed="${ui.lpdev === k}" data-lact="dev" data-dv="${k}">${l}</button>`).join("")}</div></div>
+            <div class="x-lpd" data-d="${ui.lpdev}" inert><div class="x-lp" id="lpw">${lpHTML(p, "lp")}</div></div></div></div>`;
+        if (focus) v.querySelector(focus)?.focus();
+      }
+      const lpCheck = () => { const m = slugErr(ui.lp), el = $("#lpe"); el.textContent = m; el.hidden = !m; $("[data-lsl]").setAttribute("aria-invalid", !!m); $("#lpu").textContent = `growthmonk.app/p/${ui.lp.slug || "…"}`; return m; };
+      function lpSave(status) {
+        const p = ui.lp;
+        if (lpCheck()) { $("[data-lsl]").focus(); return toast("Fix the URL slug first."); }
+        Object.assign(p, { name: p.name.trim() || "Untitled page", status });
+        const k = state.lps.findIndex((x) => x.id === p.id);
+        if (k < 0) { p.id = Date.now(); state.lps.unshift(structuredClone(p)); } else state.lps[k] = structuredClone(p);
+        ui.lpauto = false;
+        lpEdit($("#view"), `[data-lact="${status === "Published" ? "pub" : "draft"}"]`);
+        toast(status === "Published" ? `Published at growthmonk.app/p/${p.slug}` : "Draft saved.");
+      }
+      function lpLive() {
+        const p = ui.lp, back = document.activeElement, el = document.createElement("div");
+        const bump = (k) => { p[k]++; const s = state.lps.find((x) => x.id === p.id); if (s) s[k]++; if ($("#lps")) $("#lps").innerHTML = lpStat(p); };
+        bump("views");
+        el.className = "x-lpo"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-label", `${p.name || "Untitled page"}, live view`);
+        el.innerHTML = `<div class="x-lpbar"><span>growthmonk.app/p/${esc(p.slug || "…")}${p.status === "Draft" ? " · Draft preview" : ""}</span><button class="x-btn x-btn--ghost" data-lpx>Close</button></div><div class="x-lp">${lpHTML(p, "lv")}</div>`;
+        const close = () => { el.remove(); document.removeEventListener("keydown", key); back?.focus(); }, key = (e) => e.key === "Escape" && close();
+        el.addEventListener("click", (e) => { if (e.target.closest("[data-lpx]")) close(); else if (e.target.closest("[data-lpgo]")) el.querySelector(".x-pform")?.scrollIntoView({ behavior: "smooth", block: "center" }); });
+        el.addEventListener("submit", (e) => {
+          e.preventDefault();
+          const fe = e.target, f = state.forms.find((x) => x.id == fe.dataset.fid);
+          if (!f || !submitForm(fe, f, fe.id.slice(0, -5))) return;
+          bump("subs");
+          fe.outerHTML = `<div class="x-email x-pform" role="status"><h3>Thank you!</h3><p>We got your details and will be in touch soon.</p></div>`;
+          toast("Submission received. Lead created in Contacts.");
+        });
+        document.addEventListener("keydown", key);
+        document.body.appendChild(el);
+        el.querySelector("[data-lpx]").focus();
+      }
+      const openLp = (id) => { const p = state.lps.find((x) => x.id == id); if (p) { ui.lp = structuredClone(p); ui.lpauto = p.slug === lslug(p.name); lpEdit($("#view")); $("#view").scrollTop = 0; } };
+      $("#view").addEventListener("click", (e) => {
+        const a = e.target.closest("[data-lact]"), row = e.target.closest("tr[data-lp]"), v = $("#view"), p = ui.lp;
+        if (row) return openLp(row.dataset.lp);
+        if (!a || a.disabled) return;
+        const i = +a.dataset.i, act = a.dataset.lact;
+        if (act === "new") { ui.lp = { id: 0, name: "", slug: "", status: "Draft", views: 0, subs: 0, secs: ["hero", "features", "form", "footer"].map((t) => sec(t)) }; ui.lpauto = true; lpEdit(v, "[data-lt]"); }
+        else if (act === "back") { ui.lp = null; lpList(v); }
+        else if (act === "dev") { ui.lpdev = a.dataset.dv; $(".x-lpd").dataset.d = ui.lpdev; document.querySelectorAll('[data-lact="dev"]').forEach((b) => b.setAttribute("aria-pressed", b === a)); }
+        else if (act === "live") lpLive();
+        else if (act === "draft" || act === "pub") lpSave(act === "pub" ? "Published" : "Draft");
+        else if (act === "add") { p.secs.push(sec(a.dataset.t)); lpEdit(v, `[data-ls="${p.secs.length - 1}"]`); }
+        else if (act === "del") { p.secs.splice(i, 1); lpEdit(v, ".x-blocks + .x-tools .x-btn"); }
+        else { const j = act === "up" ? i - 1 : i + 1; [p.secs[i], p.secs[j]] = [p.secs[j], p.secs[i]]; lpEdit(v, `[data-lact="${act}"][data-i="${j}"]:not(:disabled), [data-ls="${j}"]`); }
+      });
+      $("#view").addEventListener("keydown", (e) => { const o = e.target.closest("tr[data-lp]"); if (o && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openLp(o.dataset.lp); } });
+      $("#view").addEventListener("input", (e) => {
+        const p = ui.lp, d = e.target.dataset, val = e.target.value;
+        if (!p) return;
+        if (d.lt != null) { p.name = val; $("#lph").textContent = val || "New landing page"; if (ui.lpauto) { p.slug = $("[data-lsl]").value = lslug(val); lpCheck(); } }
+        else if (d.lsl != null) { ui.lpauto = false; p.slug = val; lpCheck(); }
+        else if (d.ls != null) p.secs[+d.ls][d.lk] = val;
+        else return;
+        $("#lpw").innerHTML = lpHTML(p, "lp");
       });
       // Service: help desk. Tickets "id|contact id|priority|status|channel|owner|minutes ago|subject|message|agent reply"
       const PRI = ["Low", "Medium", "High", "Urgent"], TST = ["New", "Open", "Waiting on customer", "Closed"], TCH = ["Email", "Chat", "Form"];
@@ -1188,7 +1322,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         }
       });
       $("#view").addEventListener("keydown", (e) => { if (e.target.id === "sadd" && e.key === "Enter") $('[data-st="stage"]').click(); });
-      const routes = { dashboard, contacts, companies, segments, campaigns, forms, settings, "help-desk": helpdesk, "knowledge-base": kb, automations: autos, "ticket-board": (v) => { ui.tk.view = "board"; helpdesk(v); } };
+      const routes = { dashboard, contacts, companies, segments, campaigns, forms, settings, "help-desk": helpdesk, "knowledge-base": kb, automations: autos, "landing-pages": landing, "ticket-board": (v) => { ui.tk.view = "board"; helpdesk(v); } };
       NAV.forEach(([, items]) => items.forEach(([id, label]) => { if (!routes[id]) routes[id] = empty(label); }));
 
       function render() {
@@ -1197,6 +1331,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (view !== "campaigns") ui.camp = null;
         if (view !== "segments") ui.seg = null;
         if (view !== "forms") ui.form = null;
+        if (view !== "landing-pages") ui.lp = null;
         if (view !== "automations") ui.flow = null;
         if (view !== "knowledge-base") ui.kb.mode = "list";
         $("#nav").innerHTML = NAV.map(([group, items]) => (group ? `<h4>${group}</h4>` : "") + items.map(([i, l, ic]) => `<a href="#/${i}" class="${i === view ? "is-on" : ""}" ${i === view ? 'aria-current="page"' : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[ic]}"/></svg>${l}</a>`).join("")).join("");
