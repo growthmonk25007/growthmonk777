@@ -6,3 +6,5 @@
 4. **Project Settings › API**: copy the Project URL and the `anon` public key into `config.js`.
 
 The anon key is safe in the frontend because row-level security limits every user to their own workspace. Never put the `service_role` key in this repo.
+
+5. Then run `supabase/schema_phase2.sql` in the SQL Editor (tickets, forms, landing pages, campaigns, segments, automations, surveys, knowledge base, public form submissions).
