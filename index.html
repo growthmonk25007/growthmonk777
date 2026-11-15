@@ -234,6 +234,17 @@
       .x-br > div { display: grid; gap: 6px; align-content: start; padding: 8px; border: 1px dashed var(--x-line); border-radius: 10px; background: #fff; transition: background .2s, box-shadow .2s; }
       .x-br .x-tag { justify-self: start; } .x-br > div + div .x-tag { background: #FBEFDD; color: var(--x-saffron-ink); } .x-br > div > select { width: 100%; box-sizing: border-box; }
       .x-flow .is-run { background: #FBEFDD; box-shadow: 0 0 0 2px var(--x-saffron); }
+      /* Surveys · Service Lagoon accent, green for main actions */
+      .x-tag[data-q] { background: var(--x-lagoon-wash); color: var(--x-lagoon-ink); } .x-tag[data-n="Promoter"] { background: #E6F2EE; } .x-tag[data-n="Passive"] { background: #EEF1F4; color: #475467; } .x-tag[data-n="Detractor"] { background: #FDE8E6; color: #B42318; }
+      .x-svs span { background: var(--x-lagoon); }
+      .x-nps { display: flex; width: 72px; height: 8px; border-radius: 999px; overflow: hidden; background: var(--x-bg); } .x-nps i:nth-child(1) { background: var(--x-primary); } .x-nps i:nth-child(2) { background: var(--x-c4); } .x-nps i:nth-child(3) { background: #B42318; }
+      .x-svk .x-progress, .x-svk .x-nps { width: 100%; height: 10px; margin: 10px 0 0; }
+      .x-svp { border-top: 4px solid var(--x-lagoon); } .x-svp :focus-visible { outline: 2px solid var(--x-lagoon); }
+      .x-svp textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--x-line); border-radius: 10px; padding: 10px 12px; font-weight: 500; resize: vertical; }
+      .x-svq { font: 600 17px/1.4 var(--x-head); margin: 0 0 12px; overflow-wrap: anywhere; }
+      .x-svsc { display: flex; flex-wrap: wrap; gap: 4px; } .x-svsc button { flex: 1; min-width: 44px; min-height: 44px; border: 1px solid var(--x-line); border-radius: 8px; background: #fff; font-weight: 700; cursor: pointer; }
+      .x-svsc button:hover { border-color: var(--x-lagoon); } .x-svsc [aria-checked="true"] { background: var(--x-lagoon); border-color: var(--x-lagoon); color: #fff; }
+      .x-svends { display: flex; justify-content: space-between; color: var(--x-muted); font-size: 12px; margin: 6px 0 14px; }
       @media (max-width: 600px) { .x-br { grid-template-columns: 1fr; } }
       @media (max-width: 600px) { .x-rule { grid-template-columns: 1fr 1fr; } }
       @media (max-width: 1100px) { .x-ed { grid-template-columns: 1fr; } .x-mail { position: static; } }
@@ -384,6 +395,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       function dashboard(v) {
         const h = new Date().getHours(), greet = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
         state.kpis[3][1] = String(state.tickets.filter((t) => t.status !== "Closed").length);
+        if (state.surveys[0].type === "CSAT") state.kpis[5][1] = svFig(state.surveys[0]);
         state.channels = TCH.map((n, i) => [n, state.tickets.filter((t) => t.ch === n).length, ["var(--x-primary)", "var(--x-chart)", "var(--x-c3)"][i]]);
         const total = state.channels.reduce((a, c) => a + c[1], 0), pct = (p) => Math.round((p / total) * 100);
         v.innerHTML = `<h1>${greet}, Growth Monk</h1><p class="x-sub">Here is how marketing and service are doing this week.</p>
@@ -408,9 +420,6 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
           options: { maintainAspectRatio: false, cutout: "68%", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${c.label}: ${c.raw} ${c.raw === 1 ? "ticket" : "tickets"}` } } } },
         }));
       }
-      const empty = (title) => (v) => {
-        v.innerHTML = `<h1>${title}</h1><p class="x-sub">${title} will live here.</p><div class="x-card x-empty"><div><img src="growthmonk-symbol.svg" alt="" style="margin-inline:auto" /><h2>Coming in the next build</h2><p class="x-sub" style="margin:0">This screen is part of the prototype roadmap.</p></div></div>`;
-      };
       // CRM: contacts
       const hit = (c, q) => !q || `${c.name} ${c.email} ${c.company}`.toLowerCase().includes(q);
       const COLS = [["name", "Name"], ["email", "Email"], ["company", "Company"], ["stage", "Lifecycle"], ["score", "Lead score"], ["owner", "Owner"], ["m", "Last activity"]];
@@ -941,7 +950,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
             ${b ? "" : `<select data-tf="st" aria-label="Filter by status">${opts(TST, f.st, "All statuses")}</select>`}<select data-tf="pr" aria-label="Filter by priority">${opts(PRI, f.pr, "All priorities")}</select><select data-tf="ow" aria-label="Filter by owner">${opts(AGENTS, f.ow, "All owners")}</select></div><div id="tk"></div></div>`;
         renderTk();
       }
-      const setTk = (t, k, val) => { if (t[k] === val) return; t[k] = val; t.th.push({ k: "e", text: `${{ status: "Status", pri: "Priority", owner: "Owner" }[k]} changed to ${val}`, at: Date.now() }); renderTk(); };
+      const setTk = (t, k, val) => { if (t[k] === val) return; t[k] = val; t.th.push({ k: "e", text: `${{ status: "Status", pri: "Priority", owner: "Owner" }[k]} changed to ${val}`, at: Date.now() }); if (k === "status" && val === "Closed") svAuto(t); renderTk(); };
       function openTicket(id) {
         const t = tget(id); if (!t) return;
         closeDrawer();
@@ -1222,6 +1231,121 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
           if (d.wk === "k" && s.t === "prop") { s.v = pvals(val)[0]; flowEdit(v, sel); }
         }
       });
+      // Service: surveys. Responses "contact id|score|minutes ago|comment" (empty score = open text)
+      const SQT = { CSAT: "CSAT 1–5", NPS: "NPS 0–10", Open: "Open text" }, DAY = 1440;
+      const svR = (s) => s.split("\n").map((l) => { const [cid, sc, m, c] = l.split("|"); return { cid: +cid, s: sc === "" ? null : +sc, at: Date.now() - m * MIN, c: c || "" }; });
+      state.svAuto = true;
+      state.surveys = [
+        { id: 1, name: "CSAT after ticket close", trig: "Sent when a ticket is closed", type: "CSAT", q: "How satisfied are you with the help you received?", resp: svR(`23|5|170|Marco: fast and friendly chat.
+4|5|1080|Quick fix, thanks Arjun.
+12|4|2880|Fixed within the day.
+13|3|6900|Fine, but I'd still love dark mode.
+1|5|${3 * DAY}|
+6|4|${4 * DAY}|Clear answer.
+11|2|${5 * DAY}|Took two days to get a reply.
+17|5|${6 * DAY}|
+9|5|${8 * DAY}|Meera went above and beyond.
+2|4|${9 * DAY}|`) },
+        { id: 2, name: "NPS quarterly", trig: "Every quarter · all customers", type: "NPS", q: "How likely are you to recommend GrowthMonk to a friend or colleague?", resp: svR(`2|10|${2 * DAY}|Replaced three tools for us.
+5|9|${3 * DAY}|
+11|9|${4 * DAY}|Help desk and CRM in one place.
+17|10|${5 * DAY}|
+23|8|${6 * DAY}|Good, reports could be deeper.
+1|7|${8 * DAY}|
+14|9|${9 * DAY}|
+3|6|${11 * DAY}|Automations are hard to debug.
+9|10|${12 * DAY}|Support is excellent.
+20|3|${14 * DAY}|Too pricey for our size.
+6|9|${16 * DAY}|
+19|8|${18 * DAY}|`) },
+        { id: 3, name: "Onboarding feedback", trig: "14 days after signup", type: "CSAT", q: "How easy was it to get your workspace set up?", resp: svR(`21|5|${DAY}|The checklist made it easy.
+16|4|${2 * DAY}|
+10|4|${4 * DAY}|CSV import took two tries.
+7|3|${6 * DAY}|Needed help with the domain.
+24|5|${7 * DAY}|
+15|4|${10 * DAY}|`) },
+      ];
+      ui.sv = null; ui.svPick = null;
+      const svGet = () => state.surveys.find((s) => s.id === ui.sv);
+      const svN = (s) => s.resp.filter((r) => r.s != null);
+      const svCnt = (s) => { const r = svN(s); return [r.filter((x) => x.s >= 9).length, r.filter((x) => x.s === 7 || x.s === 8).length, r.filter((x) => x.s <= 6).length, r.length]; };
+      const svScore = (s) => { const r = svN(s); if (s.type === "Open" || !r.length) return null;
+        if (s.type === "CSAT") return Math.round((r.filter((x) => x.s >= 4).length / r.length) * 100);
+        const [p, , d, n] = svCnt(s); return Math.round(((p - d) / n) * 100); };
+      const svFig = (s) => { const v = svScore(s); return v == null ? "—" : s.type === "CSAT" ? v + "%" : (v > 0 ? "+" : "") + v; };
+      const svBar = (s) => { const v = svScore(s); if (v == null) return ""; if (s.type === "CSAT") return `<span class="x-progress x-svs"><span style="width:${v}%"></span></span>`;
+        const [p, pa, d, n] = svCnt(s), w = (k) => (k / n) * 100; return `<span class="x-nps"><i style="width:${w(p)}%"></i><i style="width:${w(pa)}%"></i><i style="width:${w(d)}%"></i></span>`; };
+      const svAria = (s) => { if (s.type === "CSAT") return `CSAT ${svFig(s)} satisfied`; const [p, pa, d] = svCnt(s); return `NPS ${svFig(s)}: ${p} promoters, ${pa} passives, ${d} detractors`; };
+      const svCell = (s) => s.type === "Open" ? `<span class="x-muted">Open text · no score</span>` : svScore(s) == null ? `<span class="x-muted">No responses yet</span>` : `<span class="x-score" aria-label="${svAria(s)}">${svBar(s)}${svFig(s)}</span>`;
+      const npsK = (n) => (n >= 9 ? "Promoter" : n >= 7 ? "Passive" : "Detractor");
+      const rScore = (r, t) => r.s == null ? `<span class="x-muted">—</span>` : t === "NPS" ? `<b>${r.s}</b> <span class="x-tag" data-n="${npsK(r.s)}">${npsK(r.s)}</span>` : `<b>${r.s}</b><span class="x-muted">/5</span>`;
+      const svDate = (at) => new Date(at).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+      const svTog = () => `<div class="x-headrow" style="align-items:center"><div><h2>Send automatically when a ticket is closed</h2><p class="x-sub" style="margin:0">Closing a Help desk ticket sends “${esc(state.surveys[0].name)}”. Replies are simulated.</p></div>${tog(state.svAuto, 'data-sva="auto"', "Send automatically when a ticket is closed")}</div>`;
+      function surveys(v, focus) { ui.sv ? svEdit(v) : svList(v); if (focus) v.querySelector(focus)?.focus(); }
+      function svList(v) {
+        v.innerHTML = `<h1>Surveys</h1><p class="x-sub">${state.surveys.length} surveys · ${state.surveys.reduce((a, s) => a + s.resp.length, 0)} responses. Click a survey for its responses and question builder.</p>
+          <div class="x-card" style="margin-bottom:16px">${svTog()}</div>
+          <div class="x-card"><div class="x-scroll">${table([{ label: "Survey", render: (s) => `<span class="x-cn"><b>${esc(s.name)}</b><small>${esc(s.trig)}</small></span>` }, { label: "Type", render: (s) => `<span class="x-tag" data-q>${SQT[s.type]}</span>` },
+            { label: "Responses", render: (s) => s.resp.length }, { label: "Score", render: svCell }], state.surveys, (s) => `class="x-click" data-svid="${s.id}" tabindex="0"`)}</div></div>`;
+      }
+      function svEdit(v) {
+        const s = svGet(), [p, pa, d] = svCnt(s), L = [["Promoters 9–10", p, "var(--x-primary)"], ["Passives 7–8", pa, "var(--x-c4)"], ["Detractors 0–6", d, "#B42318"]];
+        v.innerHTML = `<button class="x-btn x-btn--ghost" data-sva="back">← All surveys</button><h1 style="margin-top:14px">${esc(s.name)}</h1><p class="x-sub">${esc(s.trig)} · ${SQT[s.type]}</p>
+          <div class="x-grid">
+            <div class="x-card x-kpi x-s4"><div class="x-lab">Responses</div><div class="x-fig">${s.resp.length}</div></div>
+            <div class="x-card x-kpi x-s8 x-svk"><div class="x-lab">${s.type === "NPS" ? "Net Promoter Score · −100 to 100" : s.type === "CSAT" ? "CSAT · share rating 4 or 5" : "Open text has no score"}</div><div class="x-fig">${svFig(s)}</div>${svBar(s)}
+              ${s.type === "NPS" ? `<ul class="x-legend" style="grid-template-columns:repeat(3,auto)">${L.map(([l, n, c]) => `<li><i style="background:${c}"></i>${l}<b>${n}</b></li>`).join("")}</ul>` : ""}</div>
+            ${s.id === 1 ? `<div class="x-card x-s12">${svTog()}</div>` : ""}
+          </div>
+          <div class="x-ed">
+            <div class="x-card"><h2>Responses</h2><p class="x-sub">Newest first</p>${s.resp.length ? `<div class="x-scroll">${table([{ label: "Contact", render: (r) => person(tcon(r).name, tcon(r).company) }, { label: "Score", render: (r) => rScore(r, s.type) },
+              { label: "Comment", render: (r) => (r.c ? esc(r.c) : `<span class="x-muted">—</span>`) }, { label: "Date", cls: "x-when", render: (r) => svDate(r.at) }], [...s.resp].sort((a, b) => b.at - a.at))}</div>` : `<p class="x-none">No responses yet. Answer the preview to add one.</p>`}</div>
+            <div class="x-mail"><div class="x-card x-kb" style="margin-bottom:16px"><h2>Question</h2><p class="x-sub">The preview updates as you type.</p>
+              <label class="x-fl">Question type<select data-sv="type">${Object.entries(SQT).map(([k, l]) => `<option value="${k}" ${k === s.type ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+              <label class="x-fl">Wording<input data-sv="q" value="${esc(s.q)}" maxlength="160" /></label></div>
+              <div class="x-card x-svp"><h2>Live preview</h2><p class="x-sub">Answer it to add a response.</p><form id="svf" novalidate>
+                <p class="x-svq" id="svq">${esc(s.q) || "Your question"}</p>
+                ${s.type === "Open" ? "" : `<div class="x-svsc" role="radiogroup" aria-labelledby="svq">${(s.type === "NPS" ? [...Array(11).keys()] : [1, 2, 3, 4, 5]).map((n) => `<button type="button" role="radio" aria-checked="${ui.svPick === n}" data-svn="${n}">${n}</button>`).join("")}</div>
+                <p class="x-svends"><span>${s.type === "NPS" ? "Not at all likely" : "Very unsatisfied"}</span><span>${s.type === "NPS" ? "Extremely likely" : "Very satisfied"}</span></p>`}
+                <label class="x-fl">${s.type === "Open" ? "Your answer" : "Comment (optional)"}<textarea name="c" rows="3"></textarea></label>
+                <label class="x-fl">Answer as<select name="cid">${[...state.contacts].sort((a, b) => a.name.localeCompare(b.name)).map((c) => `<option value="${c.id}">${esc(c.name)} · ${esc(c.company)}</option>`).join("")}</select></label>
+                <p class="x-err" role="alert" hidden></p><button class="x-btn">Submit response</button></form></div></div>
+          </div>`;
+      }
+      function svAuto(t) {
+        const s = state.surveys[0], c = tcon(t), k = Math.floor(Math.random() * 4);
+        if (!state.svAuto) return;
+        const sc = s.type === "Open" ? null : (s.type === "NPS" ? [10, 9, 8, 6] : [5, 5, 4, 3])[k], out = s.type === "CSAT" ? 5 : 10;
+        s.resp.push({ cid: c.id, s: sc, c: ["Quick and clear, thanks.", "", "Sorted in one reply.", "Took a while, but it's fixed."][k] || (sc == null ? "Thanks for the help." : ""), at: Date.now() });
+        const what = sc == null ? "answered the survey" : `rated it ${sc} out of ${out}`;
+        t.th.push({ k: "e", text: `${s.name} sent · ${c.name} ${what}`, at: Date.now() });
+        state.activity.unshift([sc == null ? `${esc(c.name)} answered the survey for ticket #${t.id}` : `${esc(c.name)} rated ticket #${t.id} ${sc} out of ${out} · ${s.type} now ${svFig(s)}`, "Survey", "Just now"]); state.activity.length = 5;
+      }
+      $("#view").addEventListener("click", (e) => {
+        const r = e.target.closest("[data-svid]"), a = e.target.closest("[data-sva]"), n = e.target.closest("[data-svn]"), v = $("#view");
+        if (r) { ui.sv = +r.dataset.svid; ui.svPick = null; surveys(v, '[data-sva="back"]'); v.scrollTop = 0; }
+        else if (a?.dataset.sva === "back") { ui.sv = null; surveys(v); }
+        else if (a?.dataset.sva === "auto") { state.svAuto = !state.svAuto; surveys(v, '[data-sva="auto"]'); toast(state.svAuto ? "Surveys will send when a ticket is closed." : "Automatic surveys off."); }
+        else if (n) { ui.svPick = +n.dataset.svn; n.parentElement.querySelectorAll("button").forEach((b) => b.setAttribute("aria-checked", b === n)); }
+      });
+      $("#view").addEventListener("keydown", (e) => { const r = e.target.matches("[data-svid]") && e.target; if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); r.click(); } });
+      $("#view").addEventListener("input", (e) => { if (e.target.dataset.sv === "q") { svGet().q = e.target.value; $("#svq").textContent = e.target.value.trim() || "Your question"; } });
+      $("#view").addEventListener("change", (e) => {
+        if (e.target.dataset.sv !== "type") return;
+        const s = svGet(), n = s.resp.length;
+        if (n && !confirm(`Changing the question type clears this survey's ${n} responses, since scores use a different scale. Continue?`)) { e.target.value = s.type; return; }
+        Object.assign(s, { type: e.target.value, resp: [] }); ui.svPick = null;
+        surveys($("#view"), '[data-sv="type"]'); toast(`Question type set to ${SQT[s.type]}.`);
+      });
+      $("#view").addEventListener("submit", (e) => {
+        if (e.target.id !== "svf") return;
+        e.preventDefault();
+        const s = svGet(), f = e.target, c = f.c.value.trim(), err = f.querySelector(".x-err");
+        const bad = s.type === "Open" ? !c && "Write an answer first." : ui.svPick == null && `Pick a score from ${s.type === "NPS" ? "0 to 10" : "1 to 5"}.`;
+        if (bad) { err.textContent = bad; err.hidden = false; return (s.type === "Open" ? f.c : f.querySelector("[data-svn]")).focus(); }
+        s.resp.push({ cid: +f.cid.value, s: s.type === "Open" ? null : ui.svPick, c, at: Date.now() }); ui.svPick = null;
+        surveys($("#view"), "#svf .x-btn"); toast(s.type === "Open" ? `Response added · ${s.resp.length} answers` : `Response added · ${s.type} now ${svFig(s)}`);
+      });
       // Settings: account, users, lifecycle stages (shared STAGES), SLA targets (shared SLAH), billing
       Object.assign(state, { co: "Growth Monk", tz: "Asia/Kolkata (UTC+05:30)", cur: "INR" });
       const ROLES = ["Admin", "Agent", "Marketer"], TZS = ["Asia/Kolkata (UTC+05:30)", "Asia/Singapore (UTC+08:00)", "Asia/Dubai (UTC+04:00)", "Europe/London (UTC+00:00)", "America/New_York (UTC−05:00)"];
@@ -1322,8 +1446,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         }
       });
       $("#view").addEventListener("keydown", (e) => { if (e.target.id === "sadd" && e.key === "Enter") $('[data-st="stage"]').click(); });
-      const routes = { dashboard, contacts, companies, segments, campaigns, forms, settings, "help-desk": helpdesk, "knowledge-base": kb, automations: autos, "landing-pages": landing, "ticket-board": (v) => { ui.tk.view = "board"; helpdesk(v); } };
-      NAV.forEach(([, items]) => items.forEach(([id, label]) => { if (!routes[id]) routes[id] = empty(label); }));
+      const routes = { dashboard, contacts, companies, segments, campaigns, forms, settings, "help-desk": helpdesk, "knowledge-base": kb, automations: autos, "landing-pages": landing, surveys, "ticket-board": (v) => { ui.tk.view = "board"; helpdesk(v); }, slas: (v) => { ui.set = "sla"; settings(v); } };
 
       function render() {
         const id = location.hash.slice(2) || "dashboard", view = routes[id] ? id : "dashboard";
@@ -1334,6 +1457,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (view !== "landing-pages") ui.lp = null;
         if (view !== "automations") ui.flow = null;
         if (view !== "knowledge-base") ui.kb.mode = "list";
+        if (view !== "surveys") ui.sv = null;
         $("#nav").innerHTML = NAV.map(([group, items]) => (group ? `<h4>${group}</h4>` : "") + items.map(([i, l, ic]) => `<a href="#/${i}" class="${i === view ? "is-on" : ""}" ${i === view ? 'aria-current="page"' : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[ic]}"/></svg>${l}</a>`).join("")).join("");
         routes[view]($("#view"));
         $("#view").scrollTop = 0;
