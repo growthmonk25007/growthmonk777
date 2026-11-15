@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"><defs>
+<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="14" y1="86" x2="86" y2="14"><stop offset="0" stop-color="#074D3F"/><stop offset="1" stop-color="#14A37F"/></linearGradient>
+<linearGradient id="gs" gradientUnits="userSpaceOnUse" x1="14" y1="86" x2="86" y2="14"><stop offset="0" stop-color="#A9601C"/><stop offset="1" stop-color="#E6B04D"/></linearGradient>
+<linearGradient id="gl" gradientUnits="userSpaceOnUse" x1="14" y1="86" x2="86" y2="14"><stop offset="0" stop-color="#145C80"/><stop offset="1" stop-color="#3AAFD6"/></linearGradient>
+<linearGradient id="tile" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#074D3F"/><stop offset="1" stop-color="#0F8C6C"/></linearGradient>
+<linearGradient id="tileS" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#A9601C"/><stop offset="1" stop-color="#E0A443"/></linearGradient>
+<linearGradient id="tileL" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#124E6E"/><stop offset="1" stop-color="#2496C2"/></linearGradient>
+<linearGradient id="dark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#062F28"/><stop offset="1" stop-color="#074D3F"/></linearGradient>
+</defs><rect width="1024" height="1024" fill="url(#tile)"/><g transform="translate(182,182) scale(6.6)"><mask id="mk11" maskUnits="userSpaceOnUse" x="-20" y="-20" width="140" height="140"><rect x="-20" y="-20" width="140" height="140" fill="#fff"/><path d="M60.00,41.00 Q85.94,30.20 93.00,3.00 Q67.06,13.80 60.00,41.00Z" fill="#000" stroke="#000" stroke-width="7"/></mask><g mask="url(#mk11)"><path d="M64.64,17.11 A36,36 0 1 0 86.00,50.00" fill="none" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round"/>
+<path d="M86.00,50.00 L56.00,50.00" fill="none" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round"/></g>
+<path d="M60.00,41.00 Q85.94,30.20 93.00,3.00 Q67.06,13.80 60.00,41.00Z" fill="#D9A441"/></g></svg>
