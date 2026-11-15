@@ -144,6 +144,15 @@
       .x-ebtn { display: inline-block; background: var(--x-saffron); color: #2B1B03; font-weight: 700; padding: 10px 18px; border-radius: 8px; }
       .x-efoot { color: var(--x-muted); font-size: 12px; border-top: 1px solid var(--x-line); padding-top: 12px; margin: 8px 0 0 !important; }
       .x-kpi--sf { border-top: 3px solid var(--x-saffron); }
+      /* Forms · reuses the campaign editor */
+      .x-fl select { width: 100%; min-height: 44px; border: 1px solid var(--x-line); border-radius: 10px; padding: 0 12px; background: #fff; font-weight: 500; outline-color: var(--x-saffron); }
+      .x-fl--check { display: flex; align-items: center; gap: 10px; } .x-fl--check b { font-weight: 500; } .x-fl--check input { width: 20px; min-height: 20px; flex: none; accent-color: var(--x-saffron); }
+      .x-pform .x-fl + .x-err { margin-top: -8px; } .x-req { color: var(--x-saffron-ink); font-style: normal; }
+      .x-pform .x-ebtn { border: 0; min-height: 44px; font: inherit; font-weight: 700; cursor: pointer; } .x-pform .x-ebtn:hover { filter: brightness(.95); }
+      .x-pform [aria-invalid="true"] { border-color: #B42318; }
+      .x-rq { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 8px; font-size: 13px; font-weight: 600; cursor: pointer; } .x-rq input { width: 18px; height: 18px; accent-color: var(--x-saffron); }
+      .x-tools .x-tab[aria-pressed="true"] { border-color: var(--x-saffron); background: #FBEFDD; color: var(--x-saffron-ink) !important; }
+      .x-code { background: var(--x-ink); color: #E6F2EE; padding: 16px; border-radius: 10px; overflow-x: auto; font: 13px/1.6 "Geist Mono", monospace; margin: 0 0 12px; white-space: pre; }
       @media (max-width: 1100px) { .x-ed { grid-template-columns: 1fr; } .x-mail { position: static; } }
       @media (max-width: 1100px) { .x-s8, .x-s4 { grid-column: span 12; } .x-s2 { grid-column: span 4; } .x-checks { grid-template-columns: 1fr 1fr; } }
       @media (max-width: 820px) {
@@ -493,13 +502,109 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (f === "subject") campCount();
         $("#mprev").innerHTML = mailHTML(c);
       });
-      const routes = { dashboard, contacts, companies, campaigns };
+      // Marketing: forms
+      const FT = { text: ["Text", "text"], email: ["Email", "email"], phone: ["Phone", "tel"], select: ["Dropdown"], check: ["Checkbox"] };
+      const fld = (s) => s.split("|").map((x) => { const [t, l, o] = x.split(":"); return { t, label: l.replace(/\*$/, ""), req: l.endsWith("*"), opts: o || "Option 1, Option 2, Option 3" }; });
+      state.forms = [
+        { id: 1, name: "Demo request", views: 1840, subs: 212, fields: fld("text:Full name*|email:Work email*|text:Company*|phone:Phone|select:Team size:1–10, 11–50, 51–200, 200+") },
+        { id: 2, name: "Newsletter signup", views: 5320, subs: 968, fields: fld("email:Email*|check:Send me the monthly newsletter*") },
+        { id: 3, name: "Contact us", views: 2110, subs: 137, fields: fld("text:Name*|email:Email*|phone:Phone|select:Topic:Sales, Support, Billing, Partnerships|check:I agree to be contacted*") },
+      ];
+      const conv = (f) => (f.views ? `${((f.subs / f.views) * 100).toFixed(1)}%` : "—");
+      const fstat = (f) => `${f.subs.toLocaleString()} submissions · ${conv(f)} conversion`;
+      const snip = (f) => `<!-- GrowthMonk form: ${f.name || "Untitled form"} -->\n<div class="gm-form" data-form-id="gm-form-${f.id || "new"}"></div>\n<script src="https://forms.growthmonk.app/embed.js" async><\/script>`;
+      function copyText(t) {
+        const done = () => toast("Copied."), fb = () => { const a = document.createElement("textarea"); a.value = t; document.body.appendChild(a); a.select(); document.execCommand("copy"); a.remove(); done(); };
+        navigator.clipboard ? navigator.clipboard.writeText(t).then(done, fb) : fb();
+      }
+      function forms(v) { ui.form ? formEdit(v) : formList(v); }
+      function formList(v) {
+        v.innerHTML = `<div class="x-headrow"><div><h1>Forms</h1><p class="x-sub">${state.forms.length} forms · ${state.forms.reduce((a, f) => a + f.subs, 0).toLocaleString()} submissions. Click one to edit it.</p></div><button class="x-btn" data-fact="new">+ New form</button></div>
+          <div class="x-card"><div class="x-scroll">${table([
+            { label: "Form", render: (r) => `<span class="x-cn"><b>${esc(r.name)}</b><small>${r.fields.filter((x) => x.req).length} required</small></span>` },
+            { label: "Fields", render: (r) => r.fields.length },
+            { label: "Views", render: (r) => r.views.toLocaleString() },
+            { label: "Submissions", render: (r) => r.subs.toLocaleString() },
+            { label: "Conversion", render: conv }], state.forms, (r) => `class="x-click" data-form="${r.id}" tabindex="0"`)}</div></div>`;
+      }
+      const prevHTML = (f) => `<form class="x-email x-pform" id="fprev" novalidate><h3>${esc(f.name || "Untitled form")}</h3>${f.fields.map((x, i) => {
+          const a = `name="f${i}" aria-describedby="pe${i}" ${x.req ? 'aria-required="true"' : ""}`, l = `${esc(x.label || FT[x.t][0])}${x.req ? '<i class="x-req" aria-hidden="true"> *</i>' : ""}`;
+          return (x.t === "check" ? `<label class="x-fl x-fl--check"><input type="checkbox" ${a} /><b>${l}</b></label>`
+            : `<label class="x-fl"><b>${l}</b>${x.t === "select" ? `<select ${a}><option value="">Choose…</option>${x.opts.split(",").map((o) => o.trim()).filter(Boolean).map((o) => `<option>${esc(o)}</option>`).join("")}</select>` : `<input type="${FT[x.t][1]}" ${a} />`}</label>`) + `<p class="x-err" id="pe${i}" hidden></p>`;
+        }).join("") || `<p class="x-muted">Add a field to start your form.</p>`}<button class="x-ebtn">Submit</button><p class="x-efoot">Powered by GrowthMonk · We never share your details.</p></form>`;
+      function formEdit(v, focus) {
+        const f = ui.form, last = f.fields.length - 1;
+        v.innerHTML = `<button class="x-sort x-muted" data-fact="back">← All forms</button>
+          <div class="x-headrow"><div><h1 id="fh">${esc(f.name || "New form")}</h1><p class="x-sub" id="fs">${fstat(f)}</p></div><button class="x-btn" data-fact="save">Save form</button></div>
+          <div class="x-tools">${[["build", "Build"], ["embed", "Embed"]].map(([k, l]) => `<button class="x-btn x-btn--ghost x-tab" aria-pressed="${ui.ftab === k}" data-fact="tab" data-t="${k}">${l}</button>`).join("")}</div>
+          ${ui.ftab === "embed" ? `<div class="x-card"><h2>Embed this form</h2><p class="x-sub">Paste this snippet where the form should appear on your site.</p><pre class="x-code"><code>${esc(snip(f))}</code></pre><button class="x-btn" data-fact="copy">Copy</button></div>`
+          : `<div class="x-ed" style="margin-top:4px"><div class="x-card">
+            <label class="x-fl">Form name<input data-fn value="${esc(f.name)}" placeholder="e.g. Webinar signup" /></label>
+            <h2>Fields</h2>
+            <ol class="x-blocks">${f.fields.map((x, i) => `<li><div class="x-bhead"><span class="x-tag">${FT[x.t][0]}</span><label class="x-rq"><input type="checkbox" data-fr="${i}" ${x.req ? "checked" : ""} />Required</label><button class="x-ib" data-fact="up" data-i="${i}" ${i ? "" : "disabled"} aria-label="Move up">↑</button><button class="x-ib" data-fact="down" data-i="${i}" ${i < last ? "" : "disabled"} aria-label="Move down">↓</button><button class="x-ib" data-fact="del" data-i="${i}" aria-label="Delete field">✕</button></div>
+              <input data-fl="${i}" value="${esc(x.label)}" aria-label="${FT[x.t][0]} field label" placeholder="Field label" />${x.t === "select" ? `<input data-fo="${i}" value="${esc(x.opts)}" aria-label="Dropdown options, comma separated" placeholder="Options, comma separated" style="margin-top:6px" />` : ""}</li>`).join("")}</ol>
+            <div class="x-tools">${Object.entries(FT).map(([t, [l]]) => `<button class="x-btn x-btn--ghost" data-fact="add" data-t="${t}">+ ${l}</button>`).join("")}</div>
+          </div><div class="x-card x-mail"><h2>Live preview</h2><p class="x-sub">Try it: a valid submission creates a Lead in Contacts.</p><div id="fpw">${prevHTML(f)}</div></div></div>`}`;
+        if (focus) v.querySelector(focus)?.focus();
+      }
+      const openForm = (id) => { const f = state.forms.find((x) => x.id == id); if (f) { ui.form = structuredClone(f); ui.ftab = "build"; formEdit($("#view")); $("#view").scrollTop = 0; } };
+      $("#view").addEventListener("click", (e) => {
+        const a = e.target.closest("[data-fact]"), row = e.target.closest("tr[data-form]"), v = $("#view"), f = ui.form;
+        if (row) return openForm(row.dataset.form);
+        if (!a || a.disabled) return;
+        const i = +a.dataset.i, act = a.dataset.fact;
+        if (act === "new") { ui.form = { id: 0, name: "", views: 0, subs: 0, fields: fld("text:Full name*|email:Email*") }; ui.ftab = "build"; formEdit(v, "[data-fn]"); }
+        else if (act === "back") { ui.form = null; formList(v); }
+        else if (act === "save") { if (!f.name.trim()) f.name = "Untitled form"; const k = state.forms.findIndex((x) => x.id === f.id); if (k >= 0) state.forms[k] = f; else state.forms.unshift(Object.assign(f, { id: Date.now() })); ui.form = null; formList(v); toast("Form saved."); }
+        else if (act === "tab") { ui.ftab = a.dataset.t; formEdit(v, `[data-t="${a.dataset.t}"]`); }
+        else if (act === "copy") copyText(snip(f));
+        else if (act === "add") { f.fields.push(fld(`${a.dataset.t}:${FT[a.dataset.t][0]} field`)[0]); formEdit(v, `[data-fl="${f.fields.length - 1}"]`); }
+        else if (act === "del") { f.fields.splice(i, 1); formEdit(v, ".x-blocks + .x-tools .x-btn"); }
+        else { const j = act === "up" ? i - 1 : i + 1; [f.fields[i], f.fields[j]] = [f.fields[j], f.fields[i]]; formEdit(v, `[data-fact="${act}"][data-i="${j}"]:not(:disabled), [data-fl="${j}"]`); }
+      });
+      $("#view").addEventListener("keydown", (e) => { const o = e.target.closest("tr[data-form]"); if (o && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openForm(o.dataset.form); } });
+      $("#view").addEventListener("input", (e) => {
+        const f = ui.form, d = e.target.dataset;
+        if (!f || e.target.closest("#fprev")) return;
+        if (d.fn != null) { f.name = e.target.value; $("#fh").textContent = f.name || "New form"; }
+        else if (d.fl != null) f.fields[+d.fl].label = e.target.value;
+        else if (d.fo != null) f.fields[+d.fo].opts = e.target.value;
+        else if (d.fr != null) f.fields[+d.fr].req = e.target.checked;
+        else return;
+        $("#fpw").innerHTML = prevHTML(f);
+      });
+      $("#view").addEventListener("submit", (e) => {
+        if (e.target.id !== "fprev") return;
+        e.preventDefault();
+        const f = ui.form, el = e.target.elements;
+        let bad = null;
+        f.fields.forEach((x, i) => {
+          const inp = el["f" + i], v = x.t === "check" ? inp.checked : inp.value.trim(), p = $("#pe" + i);
+          const msg = x.req && !v ? (x.t === "check" ? "Please tick this box." : "This field is required.") : x.t === "email" && v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "Enter a valid email address." : "";
+          p.textContent = msg; p.hidden = !msg; inp.setAttribute("aria-invalid", !!msg);
+          if (msg && !bad) bad = inp;
+        });
+        if (bad) return bad.focus();
+        const get = (t, re) => { const k = f.fields.findIndex((x) => x.t === t && (!re || re.test(x.label))); return k < 0 ? "" : el["f" + k].value.trim(); };
+        const email = get("email").toLowerCase(), name = get("text", /name/i) || get("text") || email.split("@")[0] || "New lead", fname = f.name || "Untitled form";
+        let company = get("text", /company|organi/i) || "—";
+        const co = state.companies.find((c) => c.name.toLowerCase() === company.toLowerCase());
+        if (co) company = co.name; else if (company !== "—") state.companies.push({ name: company, domain: email.split("@")[1] || "—", industry: "—", city: "—" });
+        state.contacts.unshift({ id: Date.now(), name, email, company, stage: "Lead", score: 10, owner: "Growth Monk", m: 0, acts: [[`Submitted the ${fname} form`, 0], ["Contact created", 0]] });
+        state.activity.unshift([`${esc(name)} submitted the ${esc(fname)} form`, "Form", "Just now"]); state.activity.length = 5;
+        f.subs++; f.views++;
+        const s = state.forms.find((x) => x.id === f.id); if (s) Object.assign(s, { subs: f.subs, views: f.views });
+        $("#fs").textContent = fstat(f); $("#fpw").innerHTML = prevHTML(f);
+        toast("Submission received. Contact created.");
+      });
+      const routes = { dashboard, contacts, companies, campaigns, forms };
       NAV.forEach(([, items]) => items.forEach(([id, label]) => { if (!routes[id]) routes[id] = empty(label); }));
 
       function render() {
         const id = location.hash.slice(2) || "dashboard", view = routes[id] ? id : "dashboard";
         charts.forEach((c) => c.destroy()); charts = [];
         if (view !== "campaigns") ui.camp = null;
+        if (view !== "forms") ui.form = null;
         $("#nav").innerHTML = NAV.map(([group, items]) => (group ? `<h4>${group}</h4>` : "") + items.map(([i, l, ic]) => `<a href="#/${i}" class="${i === view ? "is-on" : ""}" ${i === view ? 'aria-current="page"' : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[ic]}"/></svg>${l}</a>`).join("")).join("");
         routes[view]($("#view"));
         $("#view").scrollTop = 0;
