@@ -123,6 +123,28 @@
       .x-tl { list-style: none; margin: 0; padding: 0 0 0 16px; border-left: 2px solid var(--x-line); display: grid; gap: 14px; }
       .x-tl li { position: relative; } .x-tl li::before { content: ""; position: absolute; left: -22px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--x-chart); border: 2px solid #fff; }
       .x-tl b { display: block; font-weight: 600; overflow-wrap: anywhere; } .x-tl span { color: var(--x-muted); font-size: 12px; }
+      /* Email campaigns · Marketing Saffron accent */
+      :root { --x-saffron: #C9822B; --x-saffron-ink: #8A5410; }
+      .x-tag[data-s="Draft"] { background: #EEF1F4; color: #475467; } .x-tag[data-s="Scheduled"] { background: #FBEFDD; color: var(--x-saffron-ink); } .x-tag[data-s="Sent"] { background: var(--x-primary); color: #fff; }
+      .x-cn b { display: block; font-weight: 700; } .x-cn small { display: block; color: var(--x-muted); font-size: 12px; }
+      .x-ed { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-top: 16px; }
+      .x-fl { display: grid; gap: 6px; font-size: 13px; font-weight: 700; margin-bottom: 12px; } .x-fl > span { display: flex; justify-content: space-between; gap: 8px; }
+      .x-fl input, .x-blocks input, .x-blocks textarea { width: 100%; box-sizing: border-box; min-height: 44px; border: 1px solid var(--x-line); border-radius: 10px; padding: 8px 12px; background: #fff; font-weight: 500; outline-color: var(--x-saffron); }
+      .x-blocks textarea { resize: vertical; }
+      .x-cnt { font-weight: 600; color: var(--x-muted); } .x-cnt.is-over { color: var(--x-saffron-ink); }
+      .x-blocks { list-style: none; margin: 10px 0 12px; padding: 0; display: grid; gap: 8px; }
+      .x-blocks li { padding: 8px 10px 10px; border: 1px solid var(--x-line); border-left: 3px solid var(--x-saffron); border-radius: 10px; background: var(--x-bg); }
+      .x-bhead { display: flex; align-items: center; gap: 2px; margin-bottom: 6px; } .x-bhead .x-tag { margin-right: auto; color: var(--x-saffron-ink); background: #FBEFDD; }
+      .x-ib { width: 44px; height: 44px; border: 0; border-radius: 8px; background: none; cursor: pointer; } .x-ib:hover { background: #fff; } .x-ib:disabled { opacity: .3; cursor: default; }
+      .x-tools .x-btn--ghost:hover { border-color: var(--x-saffron); }
+      .x-mail { position: sticky; top: 0; }
+      .x-inbox { padding: 10px 14px; border: 1px solid var(--x-line); border-radius: 10px; margin-bottom: 12px; } .x-inbox b, .x-inbox span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .x-inbox span { color: var(--x-muted); font-size: 13px; }
+      .x-email { border: 1px solid var(--x-line); border-top: 4px solid var(--x-saffron); border-radius: 10px; padding: 24px; background: #fff; }
+      .x-email h3 { font: 600 20px/1.3 var(--x-head); margin: 0 0 10px; overflow-wrap: anywhere; } .x-email p { margin: 0 0 14px; overflow-wrap: anywhere; }
+      .x-ebtn { display: inline-block; background: var(--x-saffron); color: #2B1B03; font-weight: 700; padding: 10px 18px; border-radius: 8px; }
+      .x-efoot { color: var(--x-muted); font-size: 12px; border-top: 1px solid var(--x-line); padding-top: 12px; margin: 8px 0 0 !important; }
+      .x-kpi--sf { border-top: 3px solid var(--x-saffron); }
+      @media (max-width: 1100px) { .x-ed { grid-template-columns: 1fr; } .x-mail { position: static; } }
       @media (max-width: 1100px) { .x-s8, .x-s4 { grid-column: span 12; } .x-s2 { grid-column: span 4; } .x-checks { grid-template-columns: 1fr 1fr; } }
       @media (max-width: 820px) {
         .x-app { grid-template-columns: 1fr; }
@@ -375,12 +397,109 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         d.innerHTML = m.length ? m.slice(0, 5).map((c) => `<li><button data-open="${c.id}">${person(c.name, `${c.company} · ${c.stage}`)}</button></li>`).join("") + `<li><a href="#/contacts">See all ${m.length} in Contacts</a></li>` : `<li class="x-none">No contacts match “${esc(ui.q.trim())}”</li>`;
         d.hidden = !q;
       }
-      const routes = { dashboard, contacts, companies };
+      // Marketing: email campaigns
+      const SEGS = { "All contacts": () => state.contacts.length, Customers: () => state.contacts.filter((c) => c.stage === "Customer").length, Leads: () => state.contacts.filter((c) => ["Lead", "MQL", "SQL"].includes(c.stage)).length };
+      const BL = { h: ["Heading", "A new heading"], p: ["Text", "Write your message here."], b: ["Button", "Learn more"] };
+      const blk = (s) => s.split("|").map((x) => ({ t: x[0], text: x.slice(2) }));
+      const camp = (id, name, status, segment, subject, preview, b, extra) => ({ id, name, status, segment, subject, preview, blocks: blk(b), ...extra });
+      state.campaigns = [
+        camp(1, "October product update", "Sent", "All contacts", "What's new in GrowthMonk this October", "Forms that save partial answers, faster search and more", "h:Fresh this October|p:Forms now save partial answers, search is twice as fast, and the help desk has a new board view.|b:See what's new", { recipients: 2412, open: 41.6, click: 6.2 }),
+        camp(2, "Welcome series: day 1", "Sent", "Leads", "Welcome to GrowthMonk, let's get you set up", "Three steps to your first campaign", "h:Welcome aboard|p:Import your contacts, connect your domain and send your first email. It takes about ten minutes.|b:Start setup", { recipients: 318, open: 54.2, click: 11.8 }),
+        camp(3, "Diwali offer for customers", "Scheduled", "Customers", "A Diwali thank-you: 20% off your next plan", "Our way of saying thanks for growing with us", "h:Happy Diwali|p:Thank you for growing with us this year. Upgrade before Nov 15 and save 20%.|b:Claim your offer", { when: "Nov 1, 10:00" }),
+        camp(4, "Webinar invite: Lead scoring 101", "Scheduled", "Leads", "Join us live: Lead scoring 101", "45 minutes, with a live Q&A", "h:Lead scoring 101|p:Learn how to rank leads by fit and intent, with real examples from GrowthMonk teams.|b:Save my seat", { when: "Nov 6, 16:00" }),
+        camp(5, "Customer stories, November", "Draft", "All contacts", "How Bloom Organics doubled repeat orders", "", "h:Customer stories|p:This month: Bloom Organics, Saffron Stays and Ruiz Coffee Co."),
+      ];
+      const dash = (v, f) => (v == null ? `<span class="x-muted">—</span>` : f(v));
+      function campaigns(v) { ui.camp ? campEdit(v) : campList(v); }
+      function campList(v) {
+        const sent = state.campaigns.filter((c) => c.status === "Sent").length;
+        v.innerHTML = `<div class="x-headrow"><div><h1>Email campaigns</h1><p class="x-sub">${state.campaigns.length} campaigns · ${sent} sent. Click one to open it.</p></div><button class="x-btn" data-cact="new">+ New campaign</button></div>
+          <div class="x-card"><div class="x-scroll">${table([
+            { label: "Campaign", render: (r) => `<span class="x-cn"><b>${esc(r.name)}</b><small>${esc(r.subject || "No subject yet")}</small></span>` },
+            { label: "Status", render: (r) => `<span class="x-cn">${chip(r.status)}${r.when ? `<small>${r.when}</small>` : ""}</span>` },
+            { label: "Segment", render: (r) => esc(r.segment) },
+            { label: "Recipients", render: (r) => dash(r.recipients, (n) => n.toLocaleString()) },
+            { label: "Opens", render: (r) => dash(r.open, (n) => `${n}%`) },
+            { label: "Clicks", render: (r) => dash(r.click, (n) => `${n}%`) }], state.campaigns, (r) => `class="x-click" data-camp="${r.id}" tabindex="0"`)}</div></div>`;
+      }
+      const mailHTML = (c) => `<div class="x-inbox"><b>${esc(c.subject || "Subject line")}</b><span>${esc(c.preview || "Preview text shows here in the inbox")}</span></div>
+        <div class="x-email">${c.blocks.map((b) => (b.t === "h" ? `<h3>${esc(b.text)}</h3>` : b.t === "b" ? `<p><span class="x-ebtn">${esc(b.text)}</span></p>` : `<p>${esc(b.text).replace(/\n/g, "<br>")}</p>`)).join("") || `<p class="x-muted">Add a block to start your email.</p>`}<p class="x-efoot">GrowthMonk · You can unsubscribe at any time.</p></div>`;
+      function campCount() {
+        const n = ui.camp.subject.length, el = $("#cnt");
+        el.textContent = `${n} / 60${n > 60 ? " · may be cut off" : ""}`; el.classList.toggle("is-over", n > 60);
+      }
+      function campEdit(v, focus) {
+        const c = ui.camp, ro = c.status === "Sent", r = ro ? "readonly" : "", last = c.blocks.length - 1;
+        v.innerHTML = `<button class="x-sort x-muted" data-cact="back">← All campaigns</button>
+          <div class="x-headrow"><div><h1>${c.id ? esc(c.name) : "New campaign"}</h1><p class="x-sub">${ro ? `Sent to ${esc(c.segment)} · read-only` : "Build the email on the left; the preview updates as you type."}</p></div>
+            ${ro ? chip("Sent") : `<div class="x-row" style="margin:0"><button class="x-btn x-btn--ghost" data-cact="draft">Save as draft</button><button class="x-btn" data-cact="send">Send…</button></div>`}</div>
+          ${ro ? `<div class="x-grid">${[["Recipients", c.recipients.toLocaleString()], ["Opened", Math.round((c.recipients * c.open) / 100).toLocaleString()], ["Open rate", `${c.open}%`], ["Click rate", `${c.click}%`]].map(([l, f]) => `<div class="x-card x-kpi x-kpi--sf" style="grid-column:span 3"><div class="x-lab">${l}</div><div class="x-fig">${f}</div></div>`).join("")}</div>` : ""}
+          <div class="x-ed"><div class="x-card">
+            <label class="x-fl">Campaign name<input data-f="name" value="${esc(c.name)}" placeholder="e.g. November newsletter" ${r} /></label>
+            <label class="x-fl"><span>Subject line <span class="x-cnt" id="cnt" aria-live="polite"></span></span><input data-f="subject" value="${esc(c.subject)}" maxlength="150" placeholder="What the inbox shows first" ${r} /></label>
+            <label class="x-fl">Preview text<input data-f="preview" value="${esc(c.preview)}" placeholder="A short line after the subject" ${r} /></label>
+            <h2>Content blocks</h2>
+            <ol class="x-blocks">${c.blocks.map((b, i) => `<li><div class="x-bhead"><span class="x-tag">${BL[b.t][0]}</span>${ro ? "" : `<button class="x-ib" data-cact="up" data-i="${i}" ${i ? "" : "disabled"} aria-label="Move up">↑</button><button class="x-ib" data-cact="down" data-i="${i}" ${i < last ? "" : "disabled"} aria-label="Move down">↓</button><button class="x-ib" data-cact="del" data-i="${i}" aria-label="Delete block">✕</button>`}</div>
+              ${b.t === "p" ? `<textarea data-b="${i}" rows="3" aria-label="Text block" ${r}>${esc(b.text)}</textarea>` : `<input data-b="${i}" value="${esc(b.text)}" aria-label="${BL[b.t][0]} text" ${r} />`}</li>`).join("")}</ol>
+            ${ro ? "" : `<div class="x-tools">${Object.entries(BL).map(([t, [l]]) => `<button class="x-btn x-btn--ghost" data-cact="add" data-t="${t}">+ ${l}</button>`).join("")}</div>`}
+          </div><div class="x-card x-mail"><h2>Preview</h2><p class="x-sub">How it looks in the inbox and when opened</p><div id="mprev">${mailHTML(c)}</div></div></div>`;
+        campCount();
+        if (focus) v.querySelector(focus)?.focus();
+      }
+      function campSave(status, extra) {
+        const c = Object.assign(ui.camp, { status, when: null, ...extra }), i = state.campaigns.findIndex((x) => x.id === c.id);
+        if (!c.name.trim()) c.name = c.subject.trim() || "Untitled campaign";
+        if (i >= 0) state.campaigns[i] = c; else state.campaigns.unshift(Object.assign(c, { id: Date.now() }));
+        ui.camp = null; campList($("#view"));
+      }
+      function campSend() {
+        const c = ui.camp;
+        if (!c.subject.trim()) { toast("Add a subject line before sending."); return $('[data-f="subject"]').focus(); }
+        if (!c.blocks.length) return toast("Add at least one block before sending.");
+        const label = (s) => `${SEGS[s]()} ${SEGS[s]() === 1 ? "recipient" : "recipients"}`;
+        modal("Send campaign", `<label>Segment<select name="segment" id="sseg">${Object.keys(SEGS).map((s) => `<option ${s === c.segment ? "selected" : ""}>${s}</option>`).join("")}</select></label><p class="x-sub" id="rc" aria-live="polite">${label(c.segment)}</p>`, (d) => {
+          const n = SEGS[d.segment]();
+          if (!n) return "This segment has no contacts yet.";
+          const name = c.name.trim() || c.subject.trim();
+          state.activity.unshift([`“${name}” campaign sent to ${n} ${d.segment === "All contacts" ? "contacts" : d.segment.toLowerCase()}`, "Email", "Just now"]); state.activity.length = 5;
+          state.checklist[2][1] = true;
+          campSave("Sent", { segment: d.segment, recipients: n, open: +(35 + Math.random() * 20).toFixed(1), click: +(4 + Math.random() * 8).toFixed(1) });
+          toast("Sent. We'll show you who opened it as it happens.");
+        });
+        const m = [...document.querySelectorAll(".x-modal")].pop();
+        m.querySelector(".x-row .x-btn:last-child").textContent = "Send now";
+        m.querySelector(".x-sub").textContent = "Simulated send. No real emails go out.";
+        m.querySelector("#sseg").addEventListener("change", (e) => { m.querySelector("#rc").textContent = label(e.target.value); });
+      }
+      const openCamp = (id) => { const c = state.campaigns.find((x) => x.id == id); if (c) { ui.camp = structuredClone(c); campEdit($("#view")); $("#view").scrollTop = 0; } };
+      $("#view").addEventListener("click", (e) => {
+        const a = e.target.closest("[data-cact]"), row = e.target.closest("[data-camp]"), v = $("#view"), c = ui.camp;
+        if (row) return openCamp(row.dataset.camp);
+        if (!a || a.disabled) return;
+        const i = +a.dataset.i, act = a.dataset.cact;
+        if (act === "new") { ui.camp = { id: 0, name: "", status: "Draft", segment: "All contacts", subject: "", preview: "", blocks: blk("h:Hello there|p:Write your message here.|b:Learn more") }; campEdit(v, '[data-f="name"]'); }
+        else if (act === "back") { ui.camp = null; campList(v); }
+        else if (act === "draft") { campSave("Draft"); toast("Draft saved."); }
+        else if (act === "send") campSend();
+        else if (act === "add") { c.blocks.push({ t: a.dataset.t, text: BL[a.dataset.t][1] }); campEdit(v, `[data-b="${c.blocks.length - 1}"]`); }
+        else if (act === "del") { c.blocks.splice(i, 1); campEdit(v, ".x-tools .x-btn"); }
+        else { const j = act === "up" ? i - 1 : i + 1; [c.blocks[i], c.blocks[j]] = [c.blocks[j], c.blocks[i]]; campEdit(v, `[data-cact="${act}"][data-i="${j}"]:not(:disabled), [data-b="${j}"]`); }
+      });
+      $("#view").addEventListener("keydown", (e) => { const o = e.target.closest("tr[data-camp]"); if (o && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openCamp(o.dataset.camp); } });
+      $("#view").addEventListener("input", (e) => {
+        const c = ui.camp, f = e.target.dataset.f, b = e.target.dataset.b;
+        if (!c || c.status === "Sent" || (f == null && b == null)) return;
+        if (f) c[f] = e.target.value; else c.blocks[+b].text = e.target.value;
+        if (f === "subject") campCount();
+        $("#mprev").innerHTML = mailHTML(c);
+      });
+      const routes = { dashboard, contacts, companies, campaigns };
       NAV.forEach(([, items]) => items.forEach(([id, label]) => { if (!routes[id]) routes[id] = empty(label); }));
 
       function render() {
         const id = location.hash.slice(2) || "dashboard", view = routes[id] ? id : "dashboard";
         charts.forEach((c) => c.destroy()); charts = [];
+        if (view !== "campaigns") ui.camp = null;
         $("#nav").innerHTML = NAV.map(([group, items]) => (group ? `<h4>${group}</h4>` : "") + items.map(([i, l, ic]) => `<a href="#/${i}" class="${i === view ? "is-on" : ""}" ${i === view ? 'aria-current="page"' : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[ic]}"/></svg>${l}</a>`).join("")).join("");
         routes[view]($("#view"));
         $("#view").scrollTop = 0;
