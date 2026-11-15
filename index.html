@@ -179,6 +179,16 @@
       .x-tkr { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .x-tkr label { display: flex; align-items: center; gap: 8px; min-height: 44px; margin-right: auto; font-size: 13px; font-weight: 600; cursor: pointer; }
       .x-tkr input { width: 18px; height: 18px; accent-color: var(--x-lagoon); }
       .x-modal textarea { border: 1px solid var(--x-line); border-radius: 10px; padding: 10px 12px; font: inherit; resize: vertical; } .x-tk2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      /* Knowledge base · Service Lagoon accent */
+      .x-tag[data-s="Published"] { background: var(--x-lagoon-wash); color: var(--x-lagoon-ink); }
+      .x-kb .x-kbh { display: flex; gap: 8px; margin: 22px 0 4px; } .x-kb .x-kbh:first-child { margin-top: 4px; }
+      .x-kb input:focus, .x-kb select:focus, .x-kb textarea:focus { outline: 2px solid var(--x-lagoon); }
+      .x-kb textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--x-line); border-radius: 10px; padding: 10px 12px; font: 400 14px/1.6 "Geist Mono", monospace; resize: vertical; }
+      .x-kbt { display: flex; gap: 6px; } .x-kbt .x-btn:hover, .x-kfb .x-btn:hover { border-color: var(--x-lagoon); }
+      .x-kart { max-width: 760px; border-top: 3px solid var(--x-lagoon); } .x-kart > .x-muted { margin: 0; font-size: 13px; }
+      .x-view .x-kart h1 { margin: 4px 0 12px; overflow-wrap: anywhere; }
+      .x-md { font-size: 15px; line-height: 1.65; overflow-wrap: anywhere; } .x-md h3 { font: 600 17px/1.3 var(--x-head); margin: 18px 0 6px; } .x-md p, .x-md ul { margin: 0 0 10px; } .x-md ul { padding-left: 20px; }
+      .x-kfb { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--x-line); }
       @media (max-width: 1100px) { .x-ed { grid-template-columns: 1fr; } .x-mail { position: static; } }
       @media (max-width: 1100px) { .x-s8, .x-s4 { grid-column: span 12; } .x-s2 { grid-column: span 4; } .x-checks { grid-template-columns: 1fr 1fr; } }
       @media (max-width: 820px) {
@@ -730,7 +740,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
           state.tickets.unshift({ id, cid: c.id, pri: d.pri, status: "New", ch: d.ch, owner: "Unassigned", at, subject, th: [{ k: "c", who: c.name, text, at }] });
           state.activity.unshift([`Ticket #${id} “${esc(subject)}” was created for ${esc(c.name)}`, "Help desk", "Just now"]); state.activity.length = 5;
           toast("Ticket created.");
-          if (cur() === "help-desk") helpdesk($("#view"));
+          if (["help-desk", "ticket-board"].includes(cur())) helpdesk($("#view"));
         });
         [...document.querySelectorAll(".x-modal")].pop().querySelector(".x-row .x-btn:last-child").textContent = "Create ticket";
       }
@@ -757,7 +767,90 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         e.preventDefault(); unOver();
         if (t && t.status !== col.dataset.col) { setTk(t, "status", col.dataset.col); toast(`#${t.id} moved to ${t.status}`); }
       });
-      const routes = { dashboard, contacts, companies, campaigns, forms, "help-desk": helpdesk };
+      // Service: knowledge base. Articles [category, title, status, views, helpful yes, no, markdown body]
+      const KCAT = ["Getting started", "Billing", "Integrations"];
+      state.kb = [
+        [0, "Set up your GrowthMonk workspace", "Published", 1840, 212, 18, "## Before you start\nYou need an **admin** account and access to your company domain.\n\n- Add your logo in **Settings**\n- Connect your domain\n- Invite your team\n\nMost teams finish in under ten minutes."],
+        [0, "Import contacts from a CSV", "Published", 1320, 141, 19, "## Prepare the file\nUse one row per contact with **Name**, **Email** and **Company** columns. Save it as UTF-8 so accented names import cleanly.\n\n## Upload\n- Go to **Contacts** and choose Import\n- Match each column to a field\n- Review the preview and confirm"],
+        [0, "Invite your team and set roles", "Draft", 0, 0, 0, "## Roles\n- **Admin**: billing, settings and users\n- **Agent**: help desk and contacts\n- **Marketer**: campaigns and forms\n\nInvites expire after 7 days."],
+        [1, "Change your plan or billing cycle", "Published", 960, 96, 17, "Open **Settings → Billing** and choose Change plan.\n\n## Upgrades\nUpgrades apply right away and are prorated.\n\n## Downgrades\nDowngrades take effect at the end of the current cycle."],
+        [1, "Download invoices and update GST details", "Published", 740, 71, 19, "Every invoice is in **Settings → Billing → Invoices**.\n\n## Update GST\n- Enter the new GST number\n- Upload your certificate\n- Ask support to reissue past invoices if needed"],
+        [1, "Switch your billing currency", "Draft", 0, 0, 0, "You can bill in **INR, USD or EUR**. The new currency starts from your next billing cycle."],
+        [2, "Connect Gmail and Outlook", "Published", 1150, 126, 14, "## Connect a mailbox\n- Go to **Settings → Integrations**\n- Choose Gmail or Outlook and sign in\n- Pick which emails to log to Contacts\n\nReplies then show up in each contact's activity."],
+        [2, "Add the chat widget to your site", "Published", 1480, 153, 31, "Copy the snippet from **Help desk → Chat → Install** and paste it before the closing body tag.\n\n## Not showing?\n- Check the domain is on your allowed list\n- Clear your site's cache after a deploy"],
+      ].map(([c, title, status, views, y, n, body], i) => ({ id: i + 1, cat: KCAT[c], title, status, views, y, n, body }));
+      ui.kb = { mode: "list", q: "", id: null, ed: null, voted: false };
+      const kget = () => state.kb.find((a) => a.id === ui.kb.id);
+      const help = (a) => (a.y + a.n ? Math.round((a.y / (a.y + a.n)) * 100) + "%" : "—");
+      const md = (s) => { let h = "", list = false; const il = (x) => x.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+        esc(s).split("\n").forEach((x) => { const li = /^[-*] /.test(x);
+          if (list && !li) { h += "</ul>"; list = false; }
+          if (li) { if (!list) { h += "<ul>"; list = true; } h += `<li>${il(x.slice(2))}</li>`; }
+          else if (/^#{1,3} /.test(x)) h += `<h3>${il(x.replace(/^#+ /, ""))}</h3>`;
+          else if (x.trim()) h += `<p>${il(x)}</p>`; });
+        return h + (list ? "</ul>" : ""); };
+      const ksnip = (a, q) => { const t = a.body.replace(/\*\*|^#+ |^- /gm, "").replace(/\s+/g, " "), i = q ? t.toLowerCase().indexOf(q) : -1;
+        return (i > 40 ? "…" + t.slice(i - 30, i + 60) : t.slice(0, 90)) + "…"; };
+      function kbList() {
+        const q = ui.kb.q.trim().toLowerCase(), rows = state.kb.filter((a) => !q || `${a.title} ${a.body}`.toLowerCase().includes(q));
+        return KCAT.map((c) => { const r = rows.filter((a) => a.cat === c);
+          return r.length ? `<h2 class="x-kbh">${c} <span class="x-muted">${r.length}</span></h2><div class="x-scroll">${table([
+            { label: "Article", render: (a) => `<span class="x-cn"><b>${esc(a.title)}</b><small>${esc(ksnip(a, q))}</small></span>` }, { label: "Status", render: (a) => chip(a.status) },
+            { label: "Views", render: (a) => a.views.toLocaleString() }, { label: "Helpful", render: help }], r, (a) => `class="x-click" data-aid="${a.id}" tabindex="0"`)}</div>` : ""; }).join("")
+          || `<p class="x-sub" style="text-align:center;margin:32px 0">No articles match. Try another search.</p>`;
+      }
+      const kfb = (a) => ui.kb.voted ? `<b>Thanks for your feedback.</b><span class="x-muted">${help(a)} of readers found this helpful.</span>`
+        : `<b>Was this helpful?</b><button class="x-btn x-btn--ghost" data-kv="y">Yes</button><button class="x-btn x-btn--ghost" data-kv="n">No</button><span class="x-muted">${help(a)} found this helpful</span>`;
+      const kbPrev = () => { const e = ui.kb.ed; $("#kbpc").textContent = "Help center · " + e.cat; $("#kbpt").textContent = e.title.trim() || "Untitled article"; $("#kbpb").innerHTML = md(e.body) || `<p class="x-muted">Start writing to see the preview.</p>`; };
+      function kb(v) {
+        const k = ui.kb, a = kget(), e = k.ed;
+        if (k.mode === "view") v.innerHTML = `<div class="x-headrow" style="margin-bottom:16px"><button class="x-btn x-btn--ghost" data-kb="back">← All articles</button><button class="x-btn x-btn--ghost" data-kb="edit">Edit article</button></div>
+          <article class="x-card x-kart"><p class="x-muted">Help center · ${a.cat}${a.status === "Draft" ? " · Draft, not visible to customers" : ""}</p><h1>${esc(a.title)}</h1><div class="x-md">${md(a.body)}</div>
+          <div class="x-kfb" id="kfb" tabindex="-1" aria-live="polite">${kfb(a)}</div></article>`;
+        else if (k.mode === "edit") { v.innerHTML = `<div class="x-headrow"><div><h1>${e.id ? "Edit article" : "New article"}</h1><p class="x-sub">Write on the left; the preview shows what customers will see.</p></div>
+            <div class="x-row" style="margin:0"><button class="x-btn x-btn--ghost" data-kb="back">Cancel</button><button class="x-btn x-btn--ghost" data-kb="Draft">Save draft</button><button class="x-btn" data-kb="Published">Publish</button></div></div>
+          <div class="x-ed" style="margin-top:4px"><div class="x-card x-kb"><label class="x-fl">Title<input data-ke="title" value="${esc(e.title)}" placeholder="e.g. Reset your password" /></label>
+            <label class="x-fl">Category<select data-ke="cat">${opts(KCAT, e.cat)}</select></label>
+            <div class="x-fl"><span id="kbbl">Body</span><div class="x-kbt" role="toolbar" aria-label="Formatting">${[["b", "Bold"], ["h", "Heading"], ["l", "List"]].map(([m, l]) => `<button type="button" class="x-btn x-btn--ghost" data-kmd="${m}">${l}</button>`).join("")}</div>
+            <textarea id="kbb" data-ke="body" rows="14" aria-labelledby="kbbl" placeholder="## A heading&#10;Write the answer. Use **bold** and - lists.">${esc(e.body)}</textarea></div></div>
+            <div class="x-card x-kart" aria-label="Preview"><p class="x-muted" id="kbpc"></p><h1 id="kbpt"></h1><div class="x-md" id="kbpb"></div></div></div>`; kbPrev(); }
+        else v.innerHTML = `<div class="x-headrow"><div><h1>Knowledge base</h1><p class="x-sub">${state.kb.length} articles · ${state.kb.filter((x) => x.status === "Published").length} published · ${state.kb.reduce((s, x) => s + x.views, 0).toLocaleString()} views. Click an article to see it as customers do.</p></div><button class="x-btn" data-kb="new">+ New article</button></div>
+          <div class="x-card x-kb"><div class="x-tools"><input type="search" data-kq placeholder="Search titles and article text" aria-label="Search articles" value="${esc(k.q)}" /></div><div id="kbl">${kbList()}</div></div>`;
+      }
+      const kbGo = (mode, f) => { Object.assign(ui.kb, { mode }); kb($("#view")); $("#view").scrollTop = 0; $(f)?.focus(); };
+      function kbIns(m) {
+        const t = $("#kbb"), s = t.selectionStart, en = t.selectionEnd, v = t.value, sel = v.slice(s, en);
+        if (m === "b") { const w = sel || "bold text"; t.setRangeText(`**${w}**`, s, en, "end"); if (!sel) t.setSelectionRange(s + 2, s + 2 + w.length); }
+        else { const ls = s ? v.lastIndexOf("\n", s - 1) + 1 : 0, blk = v.slice(ls, en); t.setRangeText(m === "h" ? "## " + blk.replace(/^#+ /, "") : blk.split("\n").map((x) => "- " + x).join("\n"), ls, en, "end"); }
+        t.focus(); ui.kb.ed.body = t.value; kbPrev();
+      }
+      function kbSave(status) {
+        const e = ui.kb.ed, title = e.title.trim();
+        if (!title) { toast("Add a title first."); return $('[data-ke="title"]').focus(); }
+        if (status === "Published" && !e.body.trim()) { toast("Write the article before publishing."); return $("#kbb").focus(); }
+        let a = state.kb.find((x) => x.id === e.id);
+        if (!a) state.kb.push((a = { id: Math.max(...state.kb.map((x) => x.id)) + 1, views: 0, y: 0, n: 0 }));
+        Object.assign(a, { title, cat: e.cat, body: e.body, status });
+        if (status === "Published") state.checklist[4][1] = true;
+        toast(status === "Published" ? `“${title}” published.` : `Draft “${title}” saved.`);
+        kbGo("list", "[data-kq]");
+      }
+      const kbOpen = (id) => { const a = state.kb.find((x) => x.id === id); a.views++; Object.assign(ui.kb, { id, voted: false }); kbGo("view", "[data-kb=back]"); };
+      $("#view").addEventListener("click", (e) => {
+        if (cur() !== "knowledge-base") return;
+        const t = (s) => e.target.closest(s), b = t("[data-kb]"), r = t("[data-aid]"), m = t("[data-kmd]"), vt = t("[data-kv]"), k = ui.kb;
+        if (m) kbIns(m.dataset.kmd);
+        else if (vt) { const a = kget(); a[vt.dataset.kv]++; k.voted = true; $("#kfb").innerHTML = kfb(a); $("#kfb").focus(); }
+        else if (r) kbOpen(+r.dataset.aid);
+        else if (b) { const d = b.dataset.kb, a = d === "edit" && kget();
+          if (d === "new" || d === "edit") { k.ed = a ? { id: a.id, title: a.title, cat: a.cat, body: a.body } : { id: null, title: "", cat: KCAT[0], body: "" }; kbGo("edit", '[data-ke="title"]'); }
+          else if (d === "back") kbGo("list", "[data-kq]"); else kbSave(d); }
+      });
+      $("#view").addEventListener("input", (e) => { const d = e.target.dataset;
+        if (d.kq != null) { ui.kb.q = e.target.value; $("#kbl").innerHTML = kbList(); }
+        else if (d.ke) { ui.kb.ed[d.ke] = e.target.value; kbPrev(); } });
+      $("#view").addEventListener("keydown", (e) => { if (e.target.matches("[data-aid]") && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); kbOpen(+e.target.dataset.aid); } });
+      const routes = { dashboard, contacts, companies, campaigns, forms, "help-desk": helpdesk, "knowledge-base": kb, "ticket-board": (v) => { ui.tk.view = "board"; helpdesk(v); } };
       NAV.forEach(([, items]) => items.forEach(([id, label]) => { if (!routes[id]) routes[id] = empty(label); }));
 
       function render() {
@@ -765,6 +858,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         charts.forEach((c) => c.destroy()); charts = [];
         if (view !== "campaigns") ui.camp = null;
         if (view !== "forms") ui.form = null;
+        if (view !== "knowledge-base") ui.kb.mode = "list";
         $("#nav").innerHTML = NAV.map(([group, items]) => (group ? `<h4>${group}</h4>` : "") + items.map(([i, l, ic]) => `<a href="#/${i}" class="${i === view ? "is-on" : ""}" ${i === view ? 'aria-current="page"' : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[ic]}"/></svg>${l}</a>`).join("")).join("");
         routes[view]($("#view"));
         $("#view").scrollTop = 0;
