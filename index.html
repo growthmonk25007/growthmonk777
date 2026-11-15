@@ -153,6 +153,32 @@
       .x-rq { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 8px; font-size: 13px; font-weight: 600; cursor: pointer; } .x-rq input { width: 18px; height: 18px; accent-color: var(--x-saffron); }
       .x-tools .x-tab[aria-pressed="true"] { border-color: var(--x-saffron); background: #FBEFDD; color: var(--x-saffron-ink) !important; }
       .x-code { background: var(--x-ink); color: #E6F2EE; padding: 16px; border-radius: 10px; overflow-x: auto; font: 13px/1.6 "Geist Mono", monospace; margin: 0 0 12px; white-space: pre; }
+      /* Help desk · Service Lagoon accent */
+      :root { --x-lagoon: #1E7FA8; --x-lagoon-ink: #155E7D; --x-lagoon-wash: #E3F1F7; }
+      .x-tag[data-s="New"], .x-tag[data-p="Medium"], .x-sla[data-l="ok"] { background: var(--x-lagoon-wash); color: var(--x-lagoon-ink); }
+      .x-tag[data-s="Open"] { background: var(--x-lagoon-ink); color: #fff; } .x-tag[data-s="Waiting on customer"], .x-sla[data-l="warn"] { background: #FBF0DA; color: #7A4F00; }
+      .x-tag[data-s="Closed"], .x-tag[data-p="Low"], .x-sla[data-l="done"] { background: #EEF1F4; color: #475467; }
+      .x-tag[data-p="High"] { background: #FDEBD3; color: #9A4A00; } .x-tag[data-p="Urgent"], .x-sla[data-l="over"] { background: #B42318; color: #fff; }
+      .x-tkv { display: flex; gap: 6px; } .x-tkv .x-tab:hover { border-color: var(--x-lagoon); }
+      .x-tkv .x-tab[aria-pressed="true"] { border-color: var(--x-lagoon); background: var(--x-lagoon-wash); color: var(--x-lagoon-ink) !important; }
+      .x-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(230px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+      .x-col { background: var(--x-bg); border-radius: 12px; border-top: 3px solid var(--x-lagoon); padding: 10px; min-height: 240px; }
+      .x-col.is-over { outline: 2px dashed var(--x-lagoon); outline-offset: -2px; }
+      .x-col h3 { display: flex; justify-content: space-between; margin: 2px 2px 4px; font: 600 13px/1.3 var(--x-head); } .x-col h3 span { color: var(--x-muted); }
+      .x-tc { display: grid; gap: 6px; margin-top: 8px; padding: 10px 12px; background: #fff; border: 1px solid var(--x-line); border-radius: 10px; cursor: grab; font-size: 13px; }
+      .x-tc:hover { border-color: var(--x-lagoon); } .x-tc:focus-visible { outline: 2px solid var(--x-lagoon); } .x-tc b { font-size: 14px; overflow-wrap: anywhere; }
+      .x-tc select { min-height: 44px; border: 1px solid var(--x-line); border-radius: 8px; padding: 0 8px; background: #fff; }
+      .x-tm { display: flex; flex-wrap: wrap; gap: 6px; }
+      .x-drawer--tk { width: min(520px, 100%); }
+      .x-th { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 10px; }
+      .x-msg { padding: 10px 12px; border: 1px solid var(--x-line); border-radius: 10px; background: var(--x-bg); }
+      .x-msg[data-k="a"] { margin-left: 24px; background: var(--x-lagoon-wash); border-color: #C6E0EC; }
+      .x-msg[data-k="n"] { margin-left: 24px; background: #FFF8E6; border: 1px dashed #E5C877; }
+      .x-msg header { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; font-size: 12px; font-weight: 700; color: var(--x-muted); }
+      .x-msg p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; } .x-ev { text-align: center; font-size: 12px; color: var(--x-muted); }
+      .x-tkr { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .x-tkr label { display: flex; align-items: center; gap: 8px; min-height: 44px; margin-right: auto; font-size: 13px; font-weight: 600; cursor: pointer; }
+      .x-tkr input { width: 18px; height: 18px; accent-color: var(--x-lagoon); }
+      .x-modal textarea { border: 1px solid var(--x-line); border-radius: 10px; padding: 10px 12px; font: inherit; resize: vertical; } .x-tk2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
       @media (max-width: 1100px) { .x-ed { grid-template-columns: 1fr; } .x-mail { position: static; } }
       @media (max-width: 1100px) { .x-s8, .x-s4 { grid-column: span 12; } .x-s2 { grid-column: span 4; } .x-checks { grid-template-columns: 1fr 1fr; } }
       @media (max-width: 820px) {
@@ -299,14 +325,16 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       }
       function dashboard(v) {
         const h = new Date().getHours(), greet = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
-        const total = state.channels.reduce((a, c) => a + c[1], 0);
+        state.kpis[3][1] = String(state.tickets.filter((t) => t.status !== "Closed").length);
+        state.channels = TCH.map((n, i) => [n, state.tickets.filter((t) => t.ch === n).length, ["var(--x-primary)", "var(--x-chart)", "var(--x-c3)"][i]]);
+        const total = state.channels.reduce((a, c) => a + c[1], 0), pct = (p) => Math.round((p / total) * 100);
         v.innerHTML = `<h1>${greet}, Growth Monk</h1><p class="x-sub">Here is how marketing and service are doing this week.</p>
           <div class="x-grid">
             <div class="x-card x-s12" id="checklist">${checklistHTML()}</div>
             ${state.kpis.map(([l, f, d]) => `<div class="x-card x-kpi x-s2"><div class="x-lab">${l}</div><div class="x-fig">${f}</div>${d ? `<span class="x-up">▲ ${d}</span>` : `<span class="x-note">This month</span>`}</div>`).join("")}
             <div class="x-card x-s8"><h2>Contacts grew every week</h2><p class="x-sub">Total contacts, last 12 weeks · 1,820 to 2,481</p><div class="x-chart"><canvas id="c-contacts" role="img" aria-label="Contacts rose from 1,820 to 2,481 over 12 weeks"></canvas></div></div>
-            <div class="x-card x-s4"><h2>Tickets by channel</h2><p class="x-sub">Share of tickets, last 30 days</p><div class="x-chart" style="height:200px"><canvas id="c-channels" role="img" aria-label="Email 46%, Chat 31%, Form 15%, Portal 8%"></canvas></div>
-              <ul class="x-legend">${state.channels.map(([n, p, c]) => `<li><i style="background:${c}"></i>${n}<b>${Math.round((p / total) * 100)}%</b></li>`).join("")}</ul></div>
+            <div class="x-card x-s4"><h2>Tickets by channel</h2><p class="x-sub">Share of all ${total} help desk tickets</p><div class="x-chart" style="height:200px"><canvas id="c-channels" role="img" aria-label="${state.channels.map(([n, p]) => `${n} ${pct(p)}%`).join(", ")}"></canvas></div>
+              <ul class="x-legend">${state.channels.map(([n, p, c]) => `<li><i style="background:${c}"></i>${n}<b>${pct(p)}%</b></li>`).join("")}</ul></div>
             <div class="x-card x-s12"><h2>Recent activity</h2><p class="x-sub">Across CRM, marketing and service</p>
               ${table([{ key: 1, render: (r) => `<span class="x-tag">${r[1]}</span>` }, { key: 0 }, { key: 2, cls: "x-when" }], state.activity)}</div>
           </div>`;
@@ -319,7 +347,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         charts.push(new Chart($("#c-channels"), {
           type: "doughnut",
           data: { labels: state.channels.map((c) => c[0]), datasets: [{ data: state.channels.map((c) => c[1]), backgroundColor: state.channels.map((c) => css(c[2].slice(4, -1))), borderColor: "#fff", borderWidth: 2 }] },
-          options: { maintainAspectRatio: false, cutout: "68%", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${c.label}: ${c.raw}%` } } } },
+          options: { maintainAspectRatio: false, cutout: "68%", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${c.label}: ${c.raw} ${c.raw === 1 ? "ticket" : "tickets"}` } } } },
         }));
       }
       const empty = (title) => (v) => {
@@ -597,7 +625,139 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         $("#fs").textContent = fstat(f); $("#fpw").innerHTML = prevHTML(f);
         toast("Submission received. Contact created.");
       });
-      const routes = { dashboard, contacts, companies, campaigns, forms };
+      // Service: help desk. Tickets "id|contact id|priority|status|channel|owner|minutes ago|subject|message|agent reply"
+      const PRI = ["Low", "Medium", "High", "Urgent"], TST = ["New", "Open", "Waiting on customer", "Closed"], TCH = ["Email", "Chat", "Form"];
+      const AGENTS = ["Ananya", "Vikram", "Meera", "Arjun", "Unassigned"], SLAH = { Low: 48, Medium: 24, High: 8, Urgent: 4 }, MIN = 60000;
+      const TK = `1053|1|High|Open|Email|Ananya|130|Can't import CSV with accented names|Our import stops at row 212 whenever a name has an accent, like José.|Thanks Priya, we can reproduce this and are working on a fix.
+1052|9|Urgent|Open|Chat|Meera|290|Chat widget missing on checkout page|Customers can't reach us from checkout since this morning's deploy.|Looking into it now, Daniel. Can you share the page URL?
+1051|5|Low|New|Form|Arjun|25|Add a second admin to our workspace|We'd like to make our ops lead an admin too.
+1050|2|Medium|Waiting on customer|Email|Vikram|600|Invoice shows the old GST number|Our October invoice still lists the GST number we changed last month.|Could you send the new GST certificate so we can reissue the invoice?
+1049|11|Urgent|New|Chat|Ananya|40|Payment failed on plan upgrade|The upgrade to Pro fails at the card step with error 402.
+1048|6|High|Open|Email|Meera|420|Workflow emails sent twice|Our welcome workflow sent two copies to every new lead yesterday.|We found a duplicate trigger and paused it while we check.
+1047|23|Low|Waiting on customer|Chat|Arjun|1500|How do I export survey results?|Is there a way to get CSAT answers into a spreadsheet?|Yes: Surveys, then Results, then Export. Did that work for you?
+1046|17|High|New|Form|Vikram|560|SSO login loops back to sign-in|After signing in with Google we land on the sign-in page again.
+1045|14|Medium|Open|Form|Meera|900|Form submissions not reaching Contacts|Entries from our Contact us form stopped showing up in Contacts.|Thanks Aisha, we're checking the field mapping on that form.
+1044|7|Low|Open|Email|Ananya|2000|Change billing currency to INR|Can we be billed in rupees from next month?|Yes, we can switch it from your next cycle.
+1043|21|Medium|New|Email|Vikram|300|Landing page domain won't verify|The DNS record has been in place for a day but still shows pending.
+1042|4|Medium|Closed|Email|Arjun|1100|Billing address update|Please update our billing address to the new Pune office.|Done, your next invoice will show the new address.
+1041|12|High|Closed|Chat|Ananya|2900|Unsubscribe link shows 404|The unsubscribe link in our last campaign leads to a 404 page.|Fixed, the link works again. Sorry for the trouble!
+1040|13|Low|Closed|Form|Meera|7000|Request: dark mode for the dashboard|Would love a dark theme for late shifts.|Thanks Jonas, we've added this to the roadmap.`;
+      state.tickets = TK.split("\n").map((l) => {
+        const [id, cid, pri, status, ch, owner, m, subject, text, reply] = l.split("|"), at = Date.now() - m * MIN, who = state.contacts[cid - 1].name;
+        return { id: +id, cid: +cid, pri, status, ch, owner, at, subject, th: [{ k: "c", who, text, at }].concat(reply ? [{ k: "a", who: owner, text: reply, at: at + (m * MIN) / 3 }] : []) };
+      });
+      ui.tk = { view: "table", q: "", st: "", pr: "", ow: "" };
+      const tget = (id) => state.tickets.find((t) => t.id == id);
+      const tcon = (t) => state.contacts.find((c) => c.id === t.cid) || { name: "Unknown", company: "—" };
+      const mins = (at) => Math.max(0, Math.round((Date.now() - at) / MIN));
+      const opts = (list, sel, all) => (all ? `<option value="">${all}</option>` : "") + list.map((o) => `<option ${o === sel ? "selected" : ""}>${o}</option>`).join("");
+      const pchip = (p) => `<span class="x-tag" data-p="${p}">${p}</span>`;
+      function sla(t) {
+        const tag = (l, s) => `<span class="x-tag x-sla" data-l="${l}">${s}</span>`;
+        if (t.status === "Closed") return tag("done", "Resolved");
+        if (t.status === "Waiting on customer") return tag("done", "Paused");
+        const left = Math.round((t.at + SLAH[t.pri] * 60 * MIN - Date.now()) / MIN);
+        return left < 0 ? tag("over", "Overdue") : tag(left < 60 ? "warn" : "ok", `${left >= 60 ? Math.floor(left / 60) + "h " : ""}${left % 60}m left`);
+      }
+      const tkRows = () => { const f = ui.tk, q = f.q.trim().toLowerCase();
+        return state.tickets.filter((t) => (!f.st || t.status === f.st) && (!f.pr || t.pri === f.pr) && (!f.ow || t.owner === f.ow) && (!q || `#${t.id} ${t.subject} ${tcon(t).name} ${tcon(t).company}`.toLowerCase().includes(q))).sort((a, b) => b.at - a.at); };
+      const tcard = (t) => `<article class="x-tc" draggable="true" data-tid="${t.id}" tabindex="0"><span class="x-muted">#${t.id} · ${t.ch} · ${ago(mins(t.at))}</span><b>${esc(t.subject)}</b><span>${esc(tcon(t).name)} <span class="x-muted">· ${t.owner}</span></span><span class="x-tm">${pchip(t.pri)}${sla(t)}</span><select data-tcs="${t.id}" aria-label="Status of ticket #${t.id}">${opts(TST, t.status)}</select></article>`;
+      function renderTk() {
+        const el = $("#tk"), rows = tkRows();
+        if (!el) return;
+        if (ui.tk.view === "board") el.innerHTML = `<div class="x-board">${TST.map((s) => { const r = rows.filter((t) => t.status === s); return `<section class="x-col" data-col="${s}" aria-label="${s}"><h3>${s}<span>${r.length}</span></h3>${r.map(tcard).join("") || `<p class="x-none">No tickets</p>`}</section>`; }).join("")}</div>`;
+        else el.innerHTML = rows.length ? `<div class="x-scroll">${table([
+            { label: "Ticket", render: (t) => `<span class="x-cn"><b>${esc(t.subject)}</b><small>#${t.id}</small></span>` }, { label: "Contact", render: (t) => person(tcon(t).name, tcon(t).company) },
+            { label: "Priority", render: (t) => pchip(t.pri) }, { label: "Status", render: (t) => chip(t.status) }, { label: "Channel", render: (t) => t.ch }, { label: "Owner", render: (t) => t.owner },
+            { label: "Created", cls: "x-when", render: (t) => ago(mins(t.at)) }, { label: "SLA", render: sla }], rows, (t) => `class="x-click" data-tid="${t.id}" tabindex="0"`)}</div>`
+          : `<p class="x-sub" style="text-align:center;margin:32px 0">No tickets match. Try another search or filter.</p>`;
+      }
+      function helpdesk(v) {
+        const f = ui.tk, b = f.view === "board", open = state.tickets.filter((t) => t.status !== "Closed").length;
+        v.innerHTML = `<div class="x-headrow"><div><h1>Help desk</h1><p class="x-sub">${state.tickets.length} tickets · ${open} open. ${b ? "Drag a card, or use its status menu, to move it." : "Click a ticket to open the conversation."}</p></div>
+            <div class="x-row" style="margin:0"><div class="x-tkv" role="group" aria-label="View">${["Table", "Board"].map((l) => `<button class="x-btn x-btn--ghost x-tab" data-tk="view" data-v="${l.toLowerCase()}" aria-pressed="${f.view === l.toLowerCase()}">${l}</button>`).join("")}</div><button class="x-btn" data-tk="new">+ New ticket</button></div></div>
+          <div class="x-card"><div class="x-tools"><input type="search" data-tf="q" placeholder="Search subject, contact or #" aria-label="Search tickets" value="${esc(f.q)}" />
+            ${b ? "" : `<select data-tf="st" aria-label="Filter by status">${opts(TST, f.st, "All statuses")}</select>`}<select data-tf="pr" aria-label="Filter by priority">${opts(PRI, f.pr, "All priorities")}</select><select data-tf="ow" aria-label="Filter by owner">${opts(AGENTS, f.ow, "All owners")}</select></div><div id="tk"></div></div>`;
+        renderTk();
+      }
+      const setTk = (t, k, val) => { if (t[k] === val) return; t[k] = val; t.th.push({ k: "e", text: `${{ status: "Status", pri: "Priority", owner: "Owner" }[k]} changed to ${val}`, at: Date.now() }); renderTk(); };
+      function openTicket(id) {
+        const t = tget(id); if (!t) return;
+        closeDrawer();
+        const c = tcon(t), el = document.createElement("div");
+        el.className = "x-dwrap"; el.id = "drawer";
+        let note = false;
+        const ph = () => (note ? "Internal note, only your team sees it…" : `Reply to ${c.name}…`);
+        const msg = (m) => m.k === "e" ? `<li class="x-ev">${esc(m.text)} · ${ago(mins(m.at))}</li>` : `<li class="x-msg" data-k="${m.k}"><header><span>${esc(m.who)}${m.k === "n" ? " · Internal note" : ""}</span><span>${ago(mins(m.at))}</span></header><p>${esc(m.text)}</p></li>`;
+        const draw = () => { el.innerHTML = `<aside class="x-drawer x-drawer--tk" role="dialog" aria-modal="true" aria-label="Ticket #${t.id}">
+          <div class="x-dhead"><div><p class="x-sub">#${t.id} · ${t.ch} · ${ago(mins(t.at))}</p><h2>${esc(t.subject)}</h2></div><button class="x-icon" data-x aria-label="Close">✕</button></div>
+          <dl class="x-dl"><dt>Contact</dt><dd>${person(c.name, c.company)}</dd><dt>SLA</dt><dd>${sla(t)}</dd>
+            ${[["status", "Status", TST], ["pri", "Priority", PRI], ["owner", "Owner", AGENTS]].map(([k, l, list]) => `<dt><label for="tk-${k}">${l}</label></dt><dd><select id="tk-${k}" data-k="${k}">${opts(list, t[k])}</select></dd>`).join("")}</dl>
+          <h3>Conversation</h3><ol class="x-th">${t.th.map(msg).join("")}</ol>
+          <form class="x-notef"><textarea name="msg" rows="4" placeholder="${esc(ph())}" aria-label="${note ? "Internal note" : "Reply"}"></textarea>
+            <div class="x-tkr"><label><input type="checkbox" id="tkn" ${note ? "checked" : ""} />Internal note</label>${t.status === "Closed" ? "" : `<button type="button" class="x-btn x-btn--ghost" data-tclose>Close ticket</button>`}<button class="x-btn" id="tksend">${note ? "Add note" : "Send"}</button></div></form></aside>`; };
+        const sync = (focus) => { draw(); renderTk(); el.querySelector(focus)?.focus(); };
+        draw();
+        el.addEventListener("click", (e) => {
+          if (e.target === el || e.target.closest("[data-x]")) closeDrawer();
+          else if (e.target.closest("[data-tclose]")) { setTk(t, "status", "Closed"); sync("[data-x]"); toast(`Ticket #${t.id} closed.`); }
+        });
+        el.addEventListener("change", (e) => {
+          const k = e.target.dataset.k, ta = el.querySelector("textarea");
+          if (k) { setTk(t, k, e.target.value); sync(`[data-k="${k}"]`); toast(`#${t.id}: ${e.target.value}`); }
+          else if (e.target.id === "tkn") { note = e.target.checked; ta.placeholder = ph(); ta.setAttribute("aria-label", note ? "Internal note" : "Reply"); $("#tksend").textContent = note ? "Add note" : "Send"; }
+        });
+        el.addEventListener("submit", (e) => {
+          e.preventDefault();
+          const text = e.target.msg.value.trim();
+          if (!text) return e.target.msg.focus();
+          t.th.push({ k: note ? "n" : "a", who: "Growth Monk", text, at: Date.now() });
+          if (!note) setTk(t, "status", "Waiting on customer");
+          sync("textarea"); toast(note ? "Internal note added." : "Reply sent. Waiting on customer.");
+        });
+        document.body.appendChild(el);
+        el.querySelector("[data-x]").focus();
+      }
+      function newTicket() {
+        modal("New ticket", `<label>Subject<input name="subject" required placeholder="e.g. Can't log in after password reset" /></label>
+          <label>Contact<select name="cid">${[...state.contacts].sort((a, b) => a.name.localeCompare(b.name)).map((c) => `<option value="${c.id}">${esc(c.name)} · ${esc(c.company)}</option>`).join("")}</select></label>
+          <div class="x-tk2"><label>Priority<select name="pri">${opts(PRI, "Medium")}</select></label><label>Channel<select name="ch">${opts(TCH, "Email")}</select></label></div>
+          <label>Description<textarea name="desc" rows="4" placeholder="What does the customer need?"></textarea></label>`, (d) => {
+          const subject = d.subject.trim(), text = d.desc.trim(), c = state.contacts.find((x) => x.id == d.cid);
+          if (subject.length < 3) return "Enter a subject.";
+          if (!text) return "Describe the issue.";
+          const id = Math.max(...state.tickets.map((t) => t.id)) + 1, at = Date.now();
+          state.tickets.unshift({ id, cid: c.id, pri: d.pri, status: "New", ch: d.ch, owner: "Unassigned", at, subject, th: [{ k: "c", who: c.name, text, at }] });
+          state.activity.unshift([`Ticket #${id} “${esc(subject)}” was created for ${esc(c.name)}`, "Help desk", "Just now"]); state.activity.length = 5;
+          toast("Ticket created.");
+          if (cur() === "help-desk") helpdesk($("#view"));
+        });
+        [...document.querySelectorAll(".x-modal")].pop().querySelector(".x-row .x-btn:last-child").textContent = "Create ticket";
+      }
+      $("#view").addEventListener("click", (e) => {
+        const a = e.target.closest("[data-tk]"), o = e.target.closest("[data-tid]");
+        if (a?.dataset.tk === "view") { ui.tk.view = a.dataset.v; helpdesk($("#view")); $(`[data-v="${a.dataset.v}"]`).focus(); }
+        else if (a?.dataset.tk === "new") newTicket();
+        else if (o && !e.target.closest("select")) openTicket(o.dataset.tid);
+      });
+      $("#view").addEventListener("keydown", (e) => { const o = e.target.matches("[data-tid]") && e.target; if (o && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openTicket(o.dataset.tid); } });
+      $("#view").addEventListener("input", (e) => { if (e.target.dataset.tf === "q") { ui.tk.q = e.target.value; renderTk(); } });
+      $("#view").addEventListener("change", (e) => {
+        const d = e.target.dataset;
+        if (d.tf && d.tf !== "q") { ui.tk[d.tf] = e.target.value; renderTk(); }
+        else if (d.tcs) { const t = tget(d.tcs); setTk(t, "status", e.target.value); toast(`#${t.id} moved to ${t.status}`); $(`[data-tcs="${t.id}"]`)?.focus(); }
+      });
+      const unOver = () => document.querySelectorAll(".x-col.is-over").forEach((x) => x.classList.remove("is-over"));
+      $("#view").addEventListener("dragstart", (e) => { const c = e.target.closest?.(".x-tc"); if (c) { e.dataTransfer.setData("text/plain", c.dataset.tid); e.dataTransfer.effectAllowed = "move"; } });
+      $("#view").addEventListener("dragover", (e) => { const col = e.target.closest?.(".x-col"); if (col) { e.preventDefault(); if (!col.classList.contains("is-over")) { unOver(); col.classList.add("is-over"); } } });
+      $("#view").addEventListener("dragend", unOver);
+      $("#view").addEventListener("drop", (e) => {
+        const col = e.target.closest?.(".x-col"), t = col && tget(e.dataTransfer.getData("text/plain"));
+        if (!col) return;
+        e.preventDefault(); unOver();
+        if (t && t.status !== col.dataset.col) { setTk(t, "status", col.dataset.col); toast(`#${t.id} moved to ${t.status}`); }
+      });
+      const routes = { dashboard, contacts, companies, campaigns, forms, "help-desk": helpdesk };
       NAV.forEach(([, items]) => items.forEach(([id, label]) => { if (!routes[id]) routes[id] = empty(label); }));
 
       function render() {
