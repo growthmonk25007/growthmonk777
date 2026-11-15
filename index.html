@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GrowthMonk App</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400&family=Sora:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    />
+    <link rel="stylesheet" href="hark.css" />
+    <link rel="stylesheet" href="hark-hero.css" />
+    <link rel="stylesheet" href="hark-charts.css" />
+    <style>
+      :root {
+        --x-side: #074D3F; --x-primary: #0B6B57; --x-chart: #14A37F; --x-ink: #0F172A;
+        --x-gold: #D9A441; --x-muted: #556275; --x-bg: #F3F6F4; --x-line: #E3E9E6;
+        --x-c2: #7FD1B9; --x-c3: #D9A441; --x-c4: #B8C6C0; --x-wash: rgba(20, 163, 127, 0.12);
+        --x-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.06);
+        --x-ui: "Manrope", system-ui, sans-serif; --x-head: "Sora", system-ui, sans-serif;
+      }
+      .x-app { position: fixed; inset: 0; z-index: 5; display: grid; grid-template-columns: 248px 1fr; background: var(--x-bg); color: var(--x-ink); font: 500 14px/1.5 var(--x-ui); }
+      .x-app button, .x-app input { font: inherit; color: inherit; }
+      .x-side { background: var(--x-side); color: #fff; display: flex; flex-direction: column; min-height: 0; }
+      .x-logo { padding: 20px 20px 12px; } .x-logo img { height: 30px; width: auto; }
+      .x-nav { flex: 1; overflow-y: auto; padding: 8px 12px; }
+      .x-nav h4 { margin: 18px 10px 6px; font: 700 12px/1 var(--x-ui); letter-spacing: .08em; color: #B5CCC6; }
+      .x-nav a { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 8px; color: rgba(255,255,255,.82); text-decoration: none; }
+      .x-nav a:hover { background: #135A4C; color: #fff; }
+      .x-nav a.is-on { background: #1C6656; color: #fff; font-weight: 700; box-shadow: inset 3px 0 0 var(--x-gold); }
+      .x-nav svg { width: 18px; height: 18px; flex: none; opacity: .9; }
+      .x-foot { padding: 16px 20px 20px; border-top: 1px solid rgba(255,255,255,.1); display: grid; gap: 10px; }
+      .x-user { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+      .x-av { width: 32px; height: 32px; border-radius: 50%; background: var(--x-primary); display: grid; place-items: center; font: 600 12px var(--x-head); color: #fff; }
+      .x-badge { justify-self: start; background: var(--x-gold); color: #3A2A06; font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 999px; }
+      .x-mainwrap { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+      .x-top { display: flex; align-items: center; gap: 12px; padding: 12px 28px; background: #fff; border-bottom: 1px solid var(--x-line); }
+      .x-search { flex: 1; max-width: 420px; height: 40px; border: 1px solid var(--x-line); border-radius: 10px; padding: 0 14px 0 38px; background: var(--x-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2364748B' stroke-width='2'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 4 4'/%3E%3C/svg%3E") 13px center no-repeat; outline: none; }
+      .x-search:focus { border-color: var(--x-chart); background-color: #fff; }
+      .x-pill { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--x-primary); background: #E6F2EE; border: 1px solid #CDE5DC; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+      .x-btn { height: 44px; padding: 0 16px; border-radius: 10px; border: 0; background: var(--x-primary); color: #fff !important; font-weight: 700; cursor: pointer; white-space: nowrap; }
+      .x-btn:hover { background: var(--x-side); }
+      .x-btn--ghost { background: #fff; color: var(--x-ink) !important; border: 1px solid var(--x-line); }
+      .x-btn--ghost:hover { background: var(--x-bg); }
+      .x-icon { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--x-line); background: #fff; display: grid; place-items: center; cursor: pointer; position: relative; }
+      .x-icon i { position: absolute; top: 9px; right: 10px; width: 7px; height: 7px; border-radius: 50%; background: var(--x-gold); }
+      .x-menu { display: none; }
+      .x-view { flex: 1; overflow-y: auto; padding: 28px; }
+      .x-view h1 { font: 600 24px/1.25 var(--x-head); margin: 0 0 4px; letter-spacing: -.01em; }
+      .x-sub { color: var(--x-muted); margin: 0 0 22px; }
+      .x-grid { display: grid; gap: 16px; grid-template-columns: repeat(12, minmax(0, 1fr)); }
+      .x-card { background: #fff; border: 1px solid var(--x-line); border-radius: 12px; box-shadow: var(--x-shadow); padding: 20px; min-width: 0; }
+      .x-card h2 { font: 600 15px/1.3 var(--x-head); margin: 0 0 4px; }
+      .x-card .x-sub { margin-bottom: 14px; font-size: 13px; }
+      .x-s12 { grid-column: span 12; } .x-s8 { grid-column: span 8; } .x-s4 { grid-column: span 4; } .x-s2 { grid-column: span 2; }
+      .x-kpi .x-lab { color: var(--x-muted); font-size: 13px; font-weight: 600; }
+      .x-kpi .x-fig { font: 600 26px/1.2 var(--x-head); margin-top: 6px; letter-spacing: -.02em; }
+      .x-up { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--x-primary); background: #E6F2EE; padding: 2px 8px; border-radius: 999px; }
+      .x-note { display: inline-block; margin-top: 6px; font-size: 12px; color: var(--x-muted); }
+      .x-progress { height: 8px; border-radius: 999px; background: var(--x-bg); overflow: hidden; margin: 6px 0 14px; }
+      .x-progress span { display: block; height: 100%; background: var(--x-chart); border-radius: inherit; transition: width .3s ease; }
+      .x-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .x-checks button { width: 100%; min-height: 48px; display: flex; align-items: center; gap: 10px; text-align: left; padding: 10px 12px; border: 1px solid var(--x-line); border-radius: 10px; background: #fff; cursor: pointer; font-weight: 600; }
+      .x-checks button:hover { border-color: var(--x-chart); }
+      .x-tick { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid var(--x-line); display: grid; place-items: center; color: #fff; font-size: 12px; }
+      .x-checks .is-done button { background: #F1F8F5; color: var(--x-muted); }
+      .x-checks .is-done .x-tick { background: var(--x-primary); border-color: var(--x-primary); }
+      .x-checks .is-done .x-t { text-decoration: line-through; }
+      .x-chart { position: relative; height: 260px; }
+      .x-legend { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 13px; }
+      .x-legend li { display: flex; align-items: center; gap: 8px; } .x-legend b { margin-left: auto; font-family: var(--x-head); font-weight: 600; }
+      .x-legend i { width: 10px; height: 10px; border-radius: 3px; }
+      .x-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      .x-table th { text-align: left; font-size: 12px; color: var(--x-muted); font-weight: 700; padding: 8px 10px; border-bottom: 1px solid var(--x-line); }
+      .x-table td { padding: 12px 10px; border-bottom: 1px solid var(--x-line); vertical-align: middle; }
+      .x-table tr:last-child td { border-bottom: 0; }
+      .x-when { color: var(--x-muted); white-space: nowrap; text-align: right; font-size: 13px; }
+      .x-tag { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--x-bg); color: var(--x-primary); white-space: nowrap; }
+      .x-empty { display: grid; place-items: center; text-align: center; padding: 72px 24px; }
+      .x-empty img { width: 64px; height: 64px; margin-bottom: 16px; }
+      .x-empty h2 { font: 600 18px var(--x-head); margin: 0 0 6px; }
+      .x-modal { position: fixed; inset: 0; z-index: 20; background: rgba(15,23,42,.45); display: grid; place-items: center; padding: 16px; }
+      .x-modal .x-card { width: min(440px, 100%); padding: 24px; }
+      .x-modal label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; margin-bottom: 12px; }
+      .x-modal input, .x-modal select { height: 42px; border: 1px solid var(--x-line); border-radius: 10px; padding: 0 12px; font: inherit; }
+      .x-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+      .x-toast { position: fixed; z-index: 30; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--x-ink); color: #fff; padding: 12px 18px; border-radius: 10px; box-shadow: var(--x-shadow); font: 600 14px var(--x-ui); }
+      .x-app select, .x-app textarea, .x-dwrap select, .x-dwrap textarea { font: inherit; color: inherit; }
+      .x-sw { position: relative; flex: 1; max-width: 420px; } .x-sw .x-search { width: 100%; max-width: none; }
+      .x-drop { position: absolute; top: 46px; left: 0; right: 0; z-index: 12; list-style: none; margin: 0; padding: 6px; background: #fff; border: 1px solid var(--x-line); border-radius: 12px; box-shadow: var(--x-shadow); }
+      .x-drop button, .x-drop a { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 10px; border: 0; border-radius: 8px; background: none; text-align: left; cursor: pointer; color: var(--x-ink); text-decoration: none; }
+      .x-drop button:hover, .x-drop a:hover { background: var(--x-bg); } .x-drop a { color: var(--x-primary); font-weight: 700; font-size: 13px; }
+      .x-drop small, .x-person small { display: block; color: var(--x-muted); font-size: 12px; font-weight: 500; }
+      .x-none { padding: 10px; color: var(--x-muted); font-size: 13px; }
+      .x-headrow { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+      .x-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+      .x-tools input, .x-tools select, .x-drawer select, .x-drawer textarea { min-height: 44px; border: 1px solid var(--x-line); border-radius: 10px; padding: 0 12px; background: #fff; outline-color: var(--x-chart); }
+      .x-tools input { flex: 1; min-width: 200px; max-width: 360px; }
+      .x-scroll { overflow-x: auto; }
+      .x-sort { border: 0; background: none; padding: 0; min-height: 32px; font: inherit; color: inherit; cursor: pointer; white-space: nowrap; } .x-sort:hover { color: var(--x-ink); }
+      .x-click { cursor: pointer; } .x-click:hover td, .x-click:focus-visible td { background: #F7FAF8; } .x-click:focus-visible { outline: 2px solid var(--x-chart); }
+      .x-person { display: flex; align-items: center; gap: 10px; font-weight: 700; white-space: nowrap; }
+      .x-muted { color: var(--x-muted); }
+      .x-score { display: flex; align-items: center; gap: 8px; font-weight: 700; } .x-score .x-progress { width: 72px; margin: 0; }
+      .x-tag[data-s="Subscriber"] { background: #EEF1F4; color: #475467; } .x-tag[data-s="Lead"] { background: #FBF0DA; color: #7A4F00; }
+      .x-tag[data-s="MQL"] { background: #E6F2EE; } .x-tag[data-s="SQL"] { background: #E3ECFB; color: #1D4ED8; } .x-tag[data-s="Customer"] { background: var(--x-primary); color: #fff; }
+      .x-pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 14px; color: var(--x-muted); font-size: 13px; }
+      .x-pager div { display: flex; gap: 6px; } .x-pager .x-btn { min-width: 44px; padding: 0 12px; }
+      .x-pager .x-btn[aria-current] { background: var(--x-primary); color: #fff !important; border-color: var(--x-primary); }
+      .x-pager .x-btn:disabled { opacity: .4; cursor: default; }
+      .x-err { color: #B42318; font-size: 13px; font-weight: 600; margin: 0 0 8px; }
+      .x-dwrap { position: fixed; inset: 0; z-index: 18; background: rgba(15,23,42,.35); font: 500 14px/1.5 var(--x-ui); color: var(--x-ink); }
+      .x-drawer { position: absolute; top: 0; right: 0; bottom: 0; width: min(420px, 100%); background: #fff; overflow-y: auto; padding: 24px; box-shadow: var(--x-shadow); }
+      .x-dhead { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; } .x-dhead div { flex: 1; min-width: 0; }
+      .x-dhead h2 { font: 600 18px/1.3 var(--x-head); margin: 0; } .x-dhead .x-sub { margin: 0; overflow-wrap: anywhere; }
+      .x-av--lg { width: 48px; height: 48px; font-size: 16px; flex: none; }
+      .x-dl { display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; margin: 0 0 22px; align-items: center; } .x-dl dt { color: var(--x-muted); font-size: 13px; font-weight: 600; } .x-dl dd { margin: 0; }
+      .x-drawer h3 { font: 600 15px var(--x-head); margin: 0 0 10px; }
+      .x-notef { display: grid; gap: 8px; margin-bottom: 16px; } .x-notef textarea { padding: 10px 12px; resize: vertical; } .x-notef .x-btn { justify-self: end; }
+      .x-tl { list-style: none; margin: 0; padding: 0 0 0 16px; border-left: 2px solid var(--x-line); display: grid; gap: 14px; }
+      .x-tl li { position: relative; } .x-tl li::before { content: ""; position: absolute; left: -22px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--x-chart); border: 2px solid #fff; }
+      .x-tl b { display: block; font-weight: 600; overflow-wrap: anywhere; } .x-tl span { color: var(--x-muted); font-size: 12px; }
+      @media (max-width: 1100px) { .x-s8, .x-s4 { grid-column: span 12; } .x-s2 { grid-column: span 4; } .x-checks { grid-template-columns: 1fr 1fr; } }
+      @media (max-width: 820px) {
+        .x-app { grid-template-columns: 1fr; }
+        .x-side { position: fixed; inset: 0 auto 0 0; width: 260px; z-index: 15; transform: translateX(-100%); transition: transform .2s ease; }
+        .x-app.is-open .x-side { transform: none; box-shadow: 0 0 0 100vmax rgba(15,23,42,.4); }
+        .x-menu { display: grid; } .x-top { padding: 10px 16px; flex-wrap: wrap; } .x-sw { order: 9; flex-basis: 100%; max-width: none; }
+        .x-view { padding: 20px 16px; } .x-s2 { grid-column: span 6; } .x-checks { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page" id="top">
+      <main class="main">
+        <div class="x-app" id="app">
+          <aside class="x-side" aria-label="Main navigation">
+            <div class="x-logo"><img src="growthmonk-logo-reversed.svg" alt="GrowthMonk" /></div>
+            <nav class="x-nav" id="nav"></nav>
+            <div class="x-foot">
+              <div class="x-user"><span class="x-av">GM</span>Growth Monk · Admin</div>
+              <span class="x-badge">Pro trial · 12 days left</span>
+            </div>
+          </aside>
+          <div class="x-mainwrap">
+            <header class="x-top">
+              <button class="x-icon x-menu" id="menu" aria-label="Open menu">☰</button>
+              <div class="x-sw"><input class="x-search" type="search" placeholder="Search contacts…" aria-label="Search contacts" id="search" autocomplete="off" aria-controls="sdrop" /><ul class="x-drop" id="sdrop" hidden></ul></div>
+              <span class="x-pill">Prototype · sample data</span>
+              <button class="x-btn" id="create">+ Create</button>
+              <button class="x-icon" id="bell" aria-label="Notifications"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg><i></i></button>
+            </header>
+            <section class="x-view" id="view" aria-live="polite"></section>
+          </div>
+        </div>
+      </main>
+    </div>
+    <script src="hark.js"></script>
+    <script src="chart.js"></script>
+    <script src="datalabels.js"></script>
+    <script src="hark-charts.js"></script>
+    <script>
+      const $ = (s) => document.querySelector(s);
+      const ICON = {
+        dash: "M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z", user: "M16 21v-2a4 4 0 0 0-8 0v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8",
+        org: "M3 21h18M5 21V7l7-4 7 4v14M9 10h1M14 10h1M9 14h1M14 14h1", seg: "M12 2a10 10 0 1 0 10 10H12z", mail: "M3 5h18v14H3zM3 6l9 7 9-7",
+        form: "M5 3h14v18H5zM9 8h6M9 12h6M9 16h3", page: "M3 4h18v16H3zM3 9h18", flow: "M5 5h4v4H5zM15 15h4v4h-4zM7 9v4a2 2 0 0 0 2 2h6",
+        help: "M4 12a8 8 0 0 1 16 0v5a2 2 0 0 1-2 2h-2v-6h4M4 13h4v6H6a2 2 0 0 1-2-2z", board: "M3 3h18v18H3zM9 3v18M15 3v18",
+        book: "M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z", star: "M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z",
+        cog: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4V3a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 10a2 2 0 1 1 0 4z",
+      };
+      const NAV = [
+        [null, [["dashboard", "Dashboard", "dash"]]],
+        ["CRM", [["contacts", "Contacts", "user"], ["companies", "Companies", "org"], ["segments", "Segments", "seg"]]],
+        ["MARKETING", [["campaigns", "Email campaigns", "mail"], ["forms", "Forms", "form"], ["landing-pages", "Landing pages", "page"], ["automations", "Automations", "flow"]]],
+        ["SERVICE", [["help-desk", "Help desk", "help"], ["ticket-board", "Ticket board", "board"], ["knowledge-base", "Knowledge base", "book"], ["surveys", "Surveys", "star"]]],
+        [null, [["settings", "Settings", "cog"]]],
+      ];
+      const state = {
+        checklist: [["Connect your domain", true], ["Import contacts", true], ["Send first campaign", false], ["Set up help desk", false], ["Publish first article", false]],
+        kpis: [["Contacts", "2,481", "+8.2%"], ["MQLs", "312"], ["Email open rate", "41.6%"], ["Open tickets", "23"], ["Avg first response", "1h 12m"], ["CSAT", "92%"]],
+        weeks: [1820, 1874, 1931, 1985, 2042, 2098, 2151, 2219, 2283, 2350, 2412, 2481],
+        channels: [["Email", 46, "var(--x-primary)"], ["Chat", 31, "var(--x-chart)"], ["Form", 15, "var(--x-c3)"], ["Portal", 8, "var(--x-c4)"]],
+        activity: [
+          ["Priya Sharma submitted the Demo request form", "Form", "4m ago"],
+          ["Ticket #1042 “Billing address update” was resolved by Arjun", "Help desk", "18m ago"],
+          ["“October product update” campaign reached 41.6% opens", "Email", "1h ago"],
+          ["Lena Fischer from Northwind moved to MQL", "CRM", "2h ago"],
+          ["Marco Ruiz rated his support chat 5 out of 5", "Survey", "3h ago"],
+        ],
+      };
+      // CRM sample data: companies [name, domain, industry, city]; contacts "name|company|stage|score|owner|minutes since last activity"
+      const STAGES = ["Subscriber", "Lead", "MQL", "SQL", "Customer"];
+      const CO = [["Bloom Organics", "bloomorganics.in", "Consumer goods", "Bengaluru"], ["Vyapar Retail", "vyaparretail.in", "Retail", "Pune"], ["Northwind Studio", "northwind.studio", "Design agency", "London"], ["Tattva Foods", "tattvafoods.in", "Food & beverage", "Mysuru"], ["Lagos Lane", "lagoslane.ng", "E-commerce", "Lagos"], ["Kaveri Fintech", "kaverifin.com", "Fintech", "Chennai"], ["Helix Health", "helixhealth.io", "Healthcare", "Berlin"], ["Saffron Stays", "saffronstays.in", "Hospitality", "Jaipur"], ["Maple & Pine", "mapleandpine.ca", "Furniture", "Toronto"], ["Indus Logistics", "induslogistics.in", "Logistics", "Mumbai"], ["Brightpath Learning", "brightpath.edu.sg", "EdTech", "Singapore"], ["Ruiz Coffee Co.", "ruizcoffee.mx", "Food & beverage", "Mexico City"]];
+      const PEOPLE = `Priya Sharma|0|MQL|78|Ananya|4
+Rohan Iyer|0|Customer|92|Ananya|2880
+Arjun Mehta|1|SQL|84|Vikram|18
+Neha Kulkarni|1|Lead|46|Vikram|300
+Sarah Collins|2|Customer|88|Ananya|95
+Lena Fischer|2|MQL|71|Meera|120
+Kavya Rao|3|Lead|52|Meera|240
+Suresh Gowda|3|Subscriber|18|Meera|10080
+Daniel Okafor|4|SQL|81|Vikram|60
+Amara Nwosu|4|Lead|39|Vikram|1440
+Karthik Subramanian|5|Customer|95|Ananya|720
+Divya Menon|5|MQL|67|Ananya|4320
+Jonas Weber|6|Lead|44|Meera|2160
+Aisha Khan|6|SQL|76|Meera|480
+Rajesh Choudhary|7|Subscriber|22|Vikram|20160
+Ishita Bansal|7|MQL|63|Vikram|1800
+Emily Tremblay|8|Customer|90|Ananya|3000
+Liam Brooks|8|Subscriber|15|Ananya|14400
+Aditya Desai|9|SQL|73|Meera|150
+Fatima Sheikh|9|Lead|49|Meera|5760
+Wei Ling Tan|10|MQL|69|Vikram|900
+Nikhil Verma|10|Subscriber|27|Vikram|8640
+Marco Ruiz|11|Customer|86|Ananya|180
+Sofia Hernández|11|Lead|41|Ananya|3600`;
+      const ACTS = ["Submitted the Demo request form", "Opened “October product update”", "Replied to a sales email", "Visited the pricing page", "Booked a discovery call", "Rated a support chat 5 out of 5"];
+      state.companies = CO.map(([name, domain, industry, city]) => ({ name, domain, industry, city }));
+      state.contacts = PEOPLE.split("\n").map((l, i) => {
+        const [name, c, stage, score, owner, m] = l.split("|"), co = CO[c];
+        return { id: i + 1, name, email: name.split(" ")[0].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() + "@" + co[1], company: co[0], stage, score: +score, owner, m: +m,
+          acts: [[ACTS[i % ACTS.length], +m], [`Moved to ${stage}`, +m + 1440], ["Contact created", +m + 20160]] };
+      });
+      const ui = { q: "", stage: "", sort: "m", dir: 1, page: 0 };
+      let charts = [];
+
+      // Helpers: escape, initials, time ago, table, modal, toast
+      const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
+      const initials = (n) => n.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+      const ago = (m) => (m < 1 ? "Just now" : m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`);
+      const chip = (s) => `<span class="x-tag" data-s="${s}">${s}</span>`;
+      const scoreBar = (s) => `<span class="x-score" aria-label="Lead score ${s} of 100"><span class="x-progress"><span style="width:${s}%"></span></span>${s}</span>`;
+      const person = (n, sub) => `<span class="x-person"><span class="x-av">${initials(n)}</span><span>${esc(n)}${sub ? `<small>${esc(sub)}</small>` : ""}</span></span>`;
+      const table = (cols, rows, rowAttr) => `<table class="x-table">${cols.some((c) => c.label) ? `<thead><tr>${cols.map((c) => `<th ${c.th || ""}>${c.label || ""}</th>`).join("")}</tr></thead>` : ""}<tbody>${rows.map((r) => `<tr ${rowAttr ? rowAttr(r) : ""}>${cols.map((c) => `<td class="${c.cls || ""}">${c.render ? c.render(r) : r[c.key]}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+      function modal(title, body, onSubmit) {
+        const el = document.createElement("div");
+        el.className = "x-modal";
+        el.innerHTML = `<form class="x-card" role="dialog" aria-modal="true" aria-label="${title}" novalidate><h2>${title}</h2><p class="x-sub">Saved in this session only.</p>${body}<p class="x-err" role="alert" hidden></p><div class="x-row"><button type="button" class="x-btn x-btn--ghost" data-close>Cancel</button><button class="x-btn">Save</button></div></form>`;
+        const close = () => el.remove();
+        el.addEventListener("click", (e) => { if (e.target === el || e.target.hasAttribute("data-close")) close(); });
+        el.querySelector("form").addEventListener("submit", (e) => {
+          e.preventDefault();
+          const err = onSubmit(Object.fromEntries(new FormData(e.target))), p = el.querySelector(".x-err");
+          if (err) { p.textContent = err; p.hidden = false; } else close();
+        });
+        document.addEventListener("keydown", function esc(e) { if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc); } });
+        document.body.appendChild(el);
+        el.querySelector("input, select")?.focus();
+      }
+      function toast(msg) {
+        const t = document.createElement("div");
+        t.className = "x-toast"; t.setAttribute("role", "status"); t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 2600);
+      }
+
+      // Views
+      function checklistHTML() {
+        const done = state.checklist.filter((c) => c[1]).length, pct = Math.round((done / state.checklist.length) * 100);
+        return `<h2>Get set up</h2><p class="x-sub">${done} of ${state.checklist.length} done · ${pct}%</p>
+          <div class="x-progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><span style="width:${pct}%"></span></div>
+          <ul class="x-checks">${state.checklist.map(([t, d], i) => `<li class="${d ? "is-done" : ""}"><button data-check="${i}" aria-pressed="${d}"><span class="x-tick">${d ? "✓" : ""}</span><span class="x-t">${t}</span></button></li>`).join("")}</ul>`;
+      }
+      function dashboard(v) {
+        const h = new Date().getHours(), greet = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+        const total = state.channels.reduce((a, c) => a + c[1], 0);
+        v.innerHTML = `<h1>${greet}, Growth Monk</h1><p class="x-sub">Here is how marketing and service are doing this week.</p>
+          <div class="x-grid">
+            <div class="x-card x-s12" id="checklist">${checklistHTML()}</div>
+            ${state.kpis.map(([l, f, d]) => `<div class="x-card x-kpi x-s2"><div class="x-lab">${l}</div><div class="x-fig">${f}</div>${d ? `<span class="x-up">▲ ${d}</span>` : `<span class="x-note">This month</span>`}</div>`).join("")}
+            <div class="x-card x-s8"><h2>Contacts grew every week</h2><p class="x-sub">Total contacts, last 12 weeks · 1,820 to 2,481</p><div class="x-chart"><canvas id="c-contacts" role="img" aria-label="Contacts rose from 1,820 to 2,481 over 12 weeks"></canvas></div></div>
+            <div class="x-card x-s4"><h2>Tickets by channel</h2><p class="x-sub">Share of tickets, last 30 days</p><div class="x-chart" style="height:200px"><canvas id="c-channels" role="img" aria-label="Email 46%, Chat 31%, Form 15%, Portal 8%"></canvas></div>
+              <ul class="x-legend">${state.channels.map(([n, p, c]) => `<li><i style="background:${c}"></i>${n}<b>${Math.round((p / total) * 100)}%</b></li>`).join("")}</ul></div>
+            <div class="x-card x-s12"><h2>Recent activity</h2><p class="x-sub">Across CRM, marketing and service</p>
+              ${table([{ key: 1, render: (r) => `<span class="x-tag">${r[1]}</span>` }, { key: 0 }, { key: 2, cls: "x-when" }], state.activity)}</div>
+          </div>`;
+        const css = (t) => getComputedStyle(document.documentElement).getPropertyValue(t).trim();
+        charts.push(new Chart($("#c-contacts"), {
+          type: "line",
+          data: { labels: state.weeks.map((_, i) => `W${i + 1}`), datasets: [{ label: "Contacts", data: state.weeks, fill: true, borderColor: css("--x-chart"), backgroundColor: css("--x-wash"), borderWidth: 2.5, pointRadius: state.weeks.map((_, i) => (i === 11 ? 4 : 0)), pointBackgroundColor: css("--x-chart") }] },
+          options: { maintainAspectRatio: false, scales: { y: { beginAtZero: false } }, plugins: { legend: { display: false } } },
+        }));
+        charts.push(new Chart($("#c-channels"), {
+          type: "doughnut",
+          data: { labels: state.channels.map((c) => c[0]), datasets: [{ data: state.channels.map((c) => c[1]), backgroundColor: state.channels.map((c) => css(c[2].slice(4, -1))), borderColor: "#fff", borderWidth: 2 }] },
+          options: { maintainAspectRatio: false, cutout: "68%", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${c.label}: ${c.raw}%` } } } },
+        }));
+      }
+      const empty = (title) => (v) => {
+        v.innerHTML = `<h1>${title}</h1><p class="x-sub">${title} will live here.</p><div class="x-card x-empty"><div><img src="growthmonk-symbol.svg" alt="" style="margin-inline:auto" /><h2>Coming in the next build</h2><p class="x-sub" style="margin:0">This screen is part of the prototype roadmap.</p></div></div>`;
+      };
+      // CRM: contacts
+      const hit = (c, q) => !q || `${c.name} ${c.email} ${c.company}`.toLowerCase().includes(q);
+      const COLS = [["name", "Name"], ["email", "Email"], ["company", "Company"], ["stage", "Lifecycle"], ["score", "Lead score"], ["owner", "Owner"], ["m", "Last activity"]];
+      const CELL = { name: (r) => person(r.name), email: (r) => `<span class="x-muted">${esc(r.email)}</span>`, company: (r) => esc(r.company), stage: (r) => chip(r.stage), score: (r) => scoreBar(r.score), m: (r) => ago(r.m) };
+      function renderContacts() {
+        const q = ui.q.trim().toLowerCase(), k = ui.sort, val = (c) => (k === "stage" ? STAGES.indexOf(c.stage) : c[k]);
+        const rows = state.contacts.filter((c) => (!ui.stage || c.stage === ui.stage) && hit(c, q))
+          .sort((a, b) => { const x = val(a), y = val(b); return (typeof x === "string" ? x.localeCompare(y) : x - y) * ui.dir; });
+        const pages = Math.max(1, Math.ceil(rows.length / 10)); ui.page = Math.min(ui.page, pages - 1);
+        const from = ui.page * 10, cols = COLS.map(([key, l]) => ({ key, cls: key === "m" ? "x-when" : "", render: CELL[key],
+          th: ui.sort === key ? `aria-sort="${ui.dir > 0 ? "ascending" : "descending"}"` : "", label: `<button class="x-sort" data-sort="${key}">${l}${ui.sort === key ? (ui.dir > 0 ? " ↑" : " ↓") : ""}</button>` }));
+        $("#ct").innerHTML = rows.length
+          ? `<div class="x-scroll">${table(cols, rows.slice(from, from + 10), (r) => `class="x-click" data-open="${r.id}" tabindex="0"`)}</div>
+            <div class="x-pager"><span>${from + 1}–${Math.min(from + 10, rows.length)} of ${rows.length}</span><div>
+              <button class="x-btn x-btn--ghost" data-page="${ui.page - 1}" ${ui.page ? "" : "disabled"} aria-label="Previous page">‹</button>
+              ${Array.from({ length: pages }, (_, i) => `<button class="x-btn x-btn--ghost" data-page="${i}" ${i === ui.page ? 'aria-current="page"' : ""}>${i + 1}</button>`).join("")}
+              <button class="x-btn x-btn--ghost" data-page="${ui.page + 1}" ${ui.page < pages - 1 ? "" : "disabled"} aria-label="Next page">›</button></div></div>`
+          : `<p class="x-sub" style="text-align:center;margin:32px 0">No contacts match. Try another search or stage.</p>`;
+      }
+      function contacts(v) {
+        v.innerHTML = `<div class="x-headrow"><div><h1>Contacts</h1><p class="x-sub">${state.contacts.length} people across ${state.companies.length} companies. Click a row for details.</p></div><button class="x-btn" data-add>+ Add contact</button></div>
+          <div class="x-card"><div class="x-tools"><input type="search" id="cq" placeholder="Search name, email or company" aria-label="Search contacts" value="${esc(ui.q)}" />
+            <select id="cs" aria-label="Filter by stage"><option value="">All stages</option>${STAGES.map((s) => `<option ${s === ui.stage ? "selected" : ""}>${s}</option>`).join("")}</select></div><div id="ct"></div></div>`;
+        renderContacts();
+      }
+      // CRM: companies, derived from contacts
+      function companies(v) {
+        const rows = state.companies.map((c) => ({ ...c, n: state.contacts.filter((p) => p.company === c.name).length })).sort((a, b) => a.name.localeCompare(b.name));
+        v.innerHTML = `<h1>Companies</h1><p class="x-sub">${rows.length} companies, derived from your contacts.</p><div class="x-card"><div class="x-scroll">${table([
+          { label: "Name", render: (r) => person(r.name) }, { label: "Domain", render: (r) => `<span class="x-muted">${esc(r.domain)}</span>` }, { label: "Industry", render: (r) => esc(r.industry) },
+          { label: "City", render: (r) => esc(r.city) }, { label: "Contacts", render: (r) => `<a class="x-tag" href="#/contacts" data-co="${esc(r.name)}">${r.n} ${r.n === 1 ? "contact" : "contacts"}</a>` }], rows)}</div></div>`;
+      }
+      const cur = () => location.hash.slice(2) || "dashboard";
+      const refresh = () => { if (["contacts", "companies"].includes(cur())) routes[cur()]($("#view")); };
+      function addContact() {
+        modal("Add contact", `<label>Name<input name="name" required placeholder="e.g. Priya Sharma" /></label><label>Email<input name="email" type="email" required placeholder="name@company.com" /></label>
+          <label>Company<input name="company" list="x-cos" required placeholder="e.g. Bloom Organics" /><datalist id="x-cos">${state.companies.map((c) => `<option value="${esc(c.name)}">`).join("")}</datalist></label>
+          <label>Stage<select name="stage">${STAGES.map((s) => `<option ${s === "Lead" ? "selected" : ""}>${s}</option>`).join("")}</select></label>`, (d) => {
+          const name = d.name.trim(), email = d.email.trim().toLowerCase();
+          let company = d.company.trim();
+          if (name.length < 2) return "Enter the contact's name.";
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email address.";
+          if (!company) return "Enter a company.";
+          if (state.contacts.some((c) => c.email === email)) return "A contact with this email already exists.";
+          const co = state.companies.find((c) => c.name.toLowerCase() === company.toLowerCase());
+          if (co) company = co.name; else state.companies.push({ name: company, domain: email.split("@")[1], industry: "—", city: "—" });
+          state.contacts.unshift({ id: Date.now(), name, email, company, stage: d.stage, score: 10, owner: "Growth Monk", m: 0, acts: [["Contact created", 0]] });
+          state.activity.unshift([`${name} from ${company} was added as ${d.stage}`, "CRM", "Just now"]); state.activity.length = 5;
+          Object.assign(ui, { q: "", stage: "", sort: "m", dir: 1, page: 0 }); $("#search").value = "";
+          toast("Contact added.");
+          if (cur() === "dashboard") render(); else refresh();
+        });
+      }
+      // Contact drawer
+      const closeDrawer = () => $("#drawer")?.remove();
+      function openDrawer(id) {
+        const c = state.contacts.find((x) => x.id == id);
+        if (!c) return;
+        closeDrawer();
+        const el = document.createElement("div");
+        el.className = "x-dwrap"; el.id = "drawer";
+        const draw = () => { el.innerHTML = `<aside class="x-drawer" role="dialog" aria-modal="true" aria-label="${esc(c.name)}">
+          <div class="x-dhead"><span class="x-av x-av--lg">${initials(c.name)}</span><div><h2>${esc(c.name)}</h2><p class="x-sub">${esc(c.email)}</p></div><button class="x-icon" data-x aria-label="Close">✕</button></div>
+          <dl class="x-dl"><dt>Company</dt><dd>${esc(c.company)}</dd><dt>Owner</dt><dd>${esc(c.owner)}</dd><dt>Lead score</dt><dd>${scoreBar(c.score)}</dd><dt>Last activity</dt><dd>${ago(c.m)}</dd>
+            <dt><label for="ds">Lifecycle stage</label></dt><dd><select id="ds">${STAGES.map((s) => `<option ${s === c.stage ? "selected" : ""}>${s}</option>`).join("")}</select></dd></dl>
+          <h3>Activity</h3><form class="x-notef"><textarea name="note" rows="3" placeholder="Add a note…" aria-label="Note"></textarea><button class="x-btn">Add note</button></form>
+          <ol class="x-tl">${c.acts.map(([t, m]) => `<li><b>${esc(t)}</b><span>${ago(m)}</span></li>`).join("")}</ol></aside>`; };
+        const touch = (act, msg, focus) => { c.acts.unshift([act, 0]); c.m = 0; draw(); el.querySelector(focus).focus(); if ($("#ct")) renderContacts(); toast(msg); };
+        draw();
+        el.addEventListener("click", (e) => { if (e.target === el || e.target.closest("[data-x]")) closeDrawer(); });
+        el.addEventListener("change", (e) => { if (e.target.id === "ds") { c.stage = e.target.value; touch(`Stage changed to ${c.stage}`, `${c.name} moved to ${c.stage}`, "#ds"); } });
+        el.addEventListener("submit", (e) => { e.preventDefault(); const t = e.target.note.value.trim(); if (!t) return e.target.note.focus(); touch(`Note: ${t}`, "Note added.", "textarea"); });
+        document.body.appendChild(el);
+        el.querySelector("[data-x]").focus();
+      }
+      // Top-bar search dropdown
+      function showDrop() {
+        const q = ui.q.trim().toLowerCase(), d = $("#sdrop"), m = state.contacts.filter((c) => hit(c, q));
+        d.innerHTML = m.length ? m.slice(0, 5).map((c) => `<li><button data-open="${c.id}">${person(c.name, `${c.company} · ${c.stage}`)}</button></li>`).join("") + `<li><a href="#/contacts">See all ${m.length} in Contacts</a></li>` : `<li class="x-none">No contacts match “${esc(ui.q.trim())}”</li>`;
+        d.hidden = !q;
+      }
+      const routes = { dashboard, contacts, companies };
+      NAV.forEach(([, items]) => items.forEach(([id, label]) => { if (!routes[id]) routes[id] = empty(label); }));
+
+      function render() {
+        const id = location.hash.slice(2) || "dashboard", view = routes[id] ? id : "dashboard";
+        charts.forEach((c) => c.destroy()); charts = [];
+        $("#nav").innerHTML = NAV.map(([group, items]) => (group ? `<h4>${group}</h4>` : "") + items.map(([i, l, ic]) => `<a href="#/${i}" class="${i === view ? "is-on" : ""}" ${i === view ? 'aria-current="page"' : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${ICON[ic]}"/></svg>${l}</a>`).join("")).join("");
+        routes[view]($("#view"));
+        $("#view").scrollTop = 0;
+        $("#app").classList.remove("is-open");
+      }
+      window.addEventListener("hashchange", render);
+      window.addEventListener("hashchange", () => { $("#sdrop").hidden = true; closeDrawer(); });
+      $("#view").addEventListener("click", (e) => {
+        const t = (s) => e.target.closest(s), b = t("[data-check]"), s = t("[data-sort]"), p = t("[data-page]"), o = t("[data-open]"), co = t("[data-co]");
+        if (b) {
+          const item = state.checklist[+b.dataset.check];
+          item[1] = !item[1];
+          $("#checklist").innerHTML = checklistHTML();
+          $(`[data-check="${b.dataset.check}"]`).focus();
+          if (item[1]) toast(`Done: ${item[0]}`);
+        } else if (s) {
+          const k = s.dataset.sort; ui.dir = ui.sort === k ? -ui.dir : 1; ui.sort = k; ui.page = 0; renderContacts(); $(`[data-sort="${k}"]`).focus();
+        } else if (p && !p.disabled) { ui.page = +p.dataset.page; renderContacts(); }
+        else if (t("[data-add]")) addContact();
+        else if (o) openDrawer(o.dataset.open);
+        else if (co) { Object.assign(ui, { q: co.dataset.co, stage: "", page: 0 }); $("#search").value = ui.q; }
+      });
+      $("#view").addEventListener("keydown", (e) => { const o = e.target.closest("tr[data-open]"); if (o && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openDrawer(o.dataset.open); } });
+      $("#view").addEventListener("input", (e) => { if (e.target.id === "cq") { ui.q = $("#search").value = e.target.value; ui.page = 0; renderContacts(); } });
+      $("#view").addEventListener("change", (e) => { if (e.target.id === "cs") { ui.stage = e.target.value; ui.page = 0; renderContacts(); } });
+      $("#create").addEventListener("click", addContact);
+      $("#bell").addEventListener("click", () => toast("3 new: 1 form submission, 2 tickets"));
+      $("#search").addEventListener("input", (e) => { ui.q = e.target.value; ui.page = 0; if ($("#cq")) { $("#cq").value = ui.q; renderContacts(); } showDrop(); });
+      $("#search").addEventListener("focus", () => ui.q.trim() && showDrop());
+      $("#search").addEventListener("keydown", (e) => { if (e.key === "Enter") { $("#sdrop").hidden = true; location.hash = "#/contacts"; } });
+      $("#sdrop").addEventListener("click", (e) => { const o = e.target.closest("[data-open]"); $("#sdrop").hidden = true; if (o) openDrawer(o.dataset.open); });
+      document.addEventListener("click", (e) => { if (!e.target.closest(".x-sw")) $("#sdrop").hidden = true; });
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") { $("#sdrop").hidden = true; closeDrawer(); } });
+      $("#menu").addEventListener("click", () => $("#app").classList.toggle("is-open"));
+      $("#app").addEventListener("click", (e) => { if (e.target === $("#app")) $("#app").classList.remove("is-open"); });
+      render();
+    </script>
+  </body>
+</html>
