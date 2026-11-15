@@ -256,7 +256,29 @@
         .x-app.is-open .x-side { transform: none; box-shadow: 0 0 0 100vmax rgba(15,23,42,.4); }
         .x-menu { display: grid; } .x-top { padding: 10px 16px; flex-wrap: wrap; } .x-sw { order: 9; flex-basis: 100%; max-width: none; }
         .x-view { padding: 20px 16px; } .x-s2 { grid-column: span 6; } .x-checks { grid-template-columns: 1fr; }
+        .x-me .x-mename { display: none; }
       }
+      /* Sign-in: full-screen auth card and the profile menu (Supabase mode only) */
+      .x-auth { position: fixed; inset: 0; z-index: 25; overflow-y: auto; background: var(--x-side); color: var(--x-ink); font: 500 14px/1.5 var(--x-ui); display: grid; place-items: center; padding: 32px 16px; }
+      .x-auth[hidden] { display: none; }
+      .x-authin { width: min(420px, 100%); display: grid; gap: 20px; justify-items: center; }
+      .x-authin > img { height: 34px; width: auto; }
+      .x-auth .x-card { width: 100%; padding: 28px; }
+      .x-auth h2 { font: 600 20px/1.3 var(--x-head); margin: 0 0 4px; }
+      .x-auth label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; margin-bottom: 12px; }
+      .x-auth input { height: 44px; border: 1px solid var(--x-line); border-radius: 10px; padding: 0 12px; font: inherit; color: inherit; }
+      .x-auth input:focus { outline: 2px solid var(--x-chart); outline-offset: 0; border-color: var(--x-chart); }
+      .x-auth .x-btn { width: 100%; margin-top: 4px; } .x-auth .x-btn:disabled { opacity: .6; cursor: progress; }
+      .x-auth .x-err { margin: 0 0 10px; }
+      .x-ok { color: var(--x-primary); background: #E6F2EE; border: 1px solid #CDE5DC; border-radius: 10px; padding: 10px 12px; font-size: 13px; font-weight: 600; margin: 0 0 14px; }
+      .x-alinks { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin-top: 14px; font-size: 13px; }
+      .x-alinks button { min-height: 44px; border: 0; background: none; padding: 0; color: var(--x-primary); font: 700 13px var(--x-ui); cursor: pointer; }
+      .x-alinks button:hover { text-decoration: underline; }
+      .x-mew { position: relative; }
+      .x-me { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px 0 6px; border: 1px solid var(--x-line); border-radius: 10px; background: #fff; cursor: pointer; font-weight: 700; max-width: 220px; }
+      .x-me .x-mename { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .x-me .x-av { flex: none; }
+      .x-mew .x-drop { left: auto; right: 0; min-width: 220px; }
+      .x-mehead { padding: 8px 10px 10px; border-bottom: 1px solid var(--x-line); margin-bottom: 4px; font-weight: 700; overflow-wrap: anywhere; }
     </style>
   </head>
   <body>
@@ -279,8 +301,18 @@
               <span class="x-pill" id="mode">Demo mode · data resets on reload</span>
               <button class="x-btn" id="create">+ Create</button>
               <button class="x-icon" id="bell" aria-label="Notifications"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg><i></i></button>
+              <div class="x-mew" id="mew" hidden>
+                <button class="x-me" id="me" aria-haspopup="true" aria-expanded="false" aria-controls="medrop"><span class="x-av" id="meav">GM</span><span class="x-mename" id="mename">Growth Monk</span></button>
+                <ul class="x-drop" id="medrop" hidden><li class="x-mehead" id="mehead"></li><li><button id="signout">Sign out</button></li></ul>
+              </div>
             </header>
             <section class="x-view" id="view" aria-live="polite"></section>
+          </div>
+        </div>
+        <div class="x-auth" id="auth" hidden>
+          <div class="x-authin">
+            <img src="growthmonk-logo-reversed.svg" alt="GrowthMonk" />
+            <div class="x-card" id="authcard"></div>
           </div>
         </div>
       </main>
@@ -419,10 +451,10 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       const scoreBar = (s) => `<span class="x-score" aria-label="Lead score ${s} of 100"><span class="x-progress"><span style="width:${s}%"></span></span>${s}</span>`;
       const person = (n, sub) => `<span class="x-person"><span class="x-av">${initials(n)}</span><span>${esc(n)}${sub ? `<small>${esc(sub)}</small>` : ""}</span></span>`;
       const table = (cols, rows, rowAttr) => `<table class="x-table">${cols.some((c) => c.label) ? `<thead><tr>${cols.map((c) => `<th ${c.th || ""}>${c.label || ""}</th>`).join("")}</tr></thead>` : ""}<tbody>${rows.map((r) => `<tr ${rowAttr ? rowAttr(r) : ""}>${cols.map((c) => `<td class="${c.cls || ""}">${c.render ? c.render(r) : r[c.key]}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
-      function modal(title, body, onSubmit) {
+      function modal(title, body, onSubmit, sub = "Saved in this session only.") {
         const el = document.createElement("div");
         el.className = "x-modal";
-        el.innerHTML = `<form class="x-card" role="dialog" aria-modal="true" aria-label="${title}" novalidate><h2>${title}</h2><p class="x-sub">Saved in this session only.</p>${body}<p class="x-err" role="alert" hidden></p><div class="x-row"><button type="button" class="x-btn x-btn--ghost" data-close>Cancel</button><button class="x-btn">Save</button></div></form>`;
+        el.innerHTML = `<form class="x-card" role="dialog" aria-modal="true" aria-label="${title}" novalidate><h2>${title}</h2><p class="x-sub">${sub}</p>${body}<p class="x-err" role="alert" hidden></p><div class="x-row"><button type="button" class="x-btn x-btn--ghost" data-close>Cancel</button><button class="x-btn">Save</button></div></form>`;
         const close = () => el.remove();
         el.addEventListener("click", (e) => { if (e.target === el || e.target.hasAttribute("data-close")) close(); });
         el.querySelector("form").addEventListener("submit", (e) => {
@@ -546,7 +578,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
             toast("Contact added.");
             if (cur() === "dashboard") render(); else refresh();
           })().catch(dbErr);
-        });
+        }, db.demo ? "Saved in this session only." : "Saved to your workspace.");
       }
       // Contact drawer
       const closeDrawer = () => $("#drawer")?.remove();
@@ -1580,7 +1612,134 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       $("#menu").addEventListener("click", () => $("#app").classList.toggle("is-open"));
       $("#app").addEventListener("click", (e) => { if (e.target === $("#app")) $("#app").classList.remove("is-open"); });
       if (!db.demo) { $("#mode").remove(); $("#create").style.marginLeft = "auto"; }
-      render();
+
+      // Sign-in: only when Supabase is configured; demo mode renders straight away
+      const gmAuth = (() => {
+        const sb = window.gmSupabase, WS_KEY = "gm-pending-workspace";
+        const store = {
+          get() { try { return sessionStorage.getItem(WS_KEY) || ""; } catch (e) { return ""; } },
+          set(v) { try { sessionStorage.setItem(WS_KEY, v); } catch (e) {} },
+          clear() { try { sessionStorage.removeItem(WS_KEY); } catch (e) {} },
+        };
+        const pageUrl = () => location.href.split("#")[0];
+        let recovering = /type=recovery/.test(location.hash), entering = false;
+        const field = (label, name, type, auto, extra = "") => `<label>${label}<input name="${name}" type="${type}" autocomplete="${auto}" required ${extra} /></label>`;
+        const link = (v, t) => `<button type="button" data-av="${v}">${t}</button>`;
+        const VIEWS = {
+          signin: { title: "Sign in", sub: "Welcome back to GrowthMonk.", btn: "Sign in",
+            body: field("Email", "email", "email", "email") + field("Password", "password", "password", "current-password"),
+            links: link("forgot", "Forgot password?") + link("signup", "Create an account") },
+          signup: { title: "Create your account", sub: "Start a workspace for your team.", btn: "Sign up",
+            body: field("Full name", "name", "text", "name") + field("Email", "email", "email", "email") + field("Password", "password", "password", "new-password", 'minlength="6"') + field("Workspace name", "ws", "text", "organization", 'placeholder="e.g. Bloom Organics"'),
+            links: link("signin", "Already have an account? Sign in") },
+          forgot: { title: "Reset your password", sub: "We'll email you a link to set a new one.", btn: "Send reset link",
+            body: field("Email", "email", "email", "email"), links: link("signin", "Back to sign in") },
+          reset: { title: "Set new password", sub: "Choose a new password for your account.", btn: "Save password",
+            body: field("New password", "password", "password", "new-password", 'minlength="6"'), links: "" },
+        };
+        function show(view, note) {
+          const v = VIEWS[view];
+          $("#authcard").innerHTML = `<form novalidate data-view="${view}" aria-label="${v.title}"><h2>${v.title}</h2><p class="x-sub">${v.sub}</p>
+            ${note ? `<p class="x-ok" role="status">${esc(note)}</p>` : ""}${v.body}<p class="x-err" role="alert" hidden></p>
+            <button class="x-btn">${v.btn}</button>${v.links ? `<div class="x-alinks">${v.links}</div>` : ""}</form>`;
+          $("#auth").hidden = false; $("#app").setAttribute("aria-hidden", "true"); $("#mew").hidden = true;
+          $("#authcard input")?.focus();
+        }
+        const hide = () => { $("#auth").hidden = true; $("#app").removeAttribute("aria-hidden"); };
+        const fail = (form, msg) => { const p = form.querySelector(".x-err"); p.textContent = msg; p.hidden = false; };
+        // Find the user's workspace, creating one on first sign-in, then open the app
+        async function enter(user, wsName) {
+          if (entering || recovering) return; entering = true;
+          try {
+            const member = async () => {
+              const { data, error } = await sb.from("workspace_members").select("workspace_id, role, workspaces(name)").eq("user_id", user.id).limit(1);
+              if (error) throw error; return (data || [])[0];
+            };
+            let m = await member();
+            if (!m) {
+              const name = (wsName || store.get() || "My workspace").trim() || "My workspace";
+              const { data, error } = await sb.rpc("create_workspace", { ws_name: name }); if (error) throw error;
+              m = await member();
+              if (!m) { const r = Array.isArray(data) ? data[0] : data; m = { workspace_id: r && typeof r === "object" ? r.workspace_id ?? r.id : r, role: "owner", workspaces: { name } }; }
+            }
+            store.clear();
+            window.gmWorkspaceId = m.workspace_id;
+            const ws = (Array.isArray(m.workspaces) ? m.workspaces[0] : m.workspaces)?.name || "My workspace";
+            const name = user.user_metadata?.full_name || user.email || "You", role = m.role ? m.role[0].toUpperCase() + m.role.slice(1) : "";
+            $("#ws").textContent = ws; state.co = ws;
+            $("#meav").textContent = $(".x-user .x-av").textContent = initials(name) || "?";
+            $("#mename").textContent = name;
+            $("#mehead").innerHTML = `${esc(name)}<small>${esc(user.email || "")}</small><small>${esc(ws)}${role ? ` · ${esc(role)}` : ""}</small>`;
+            $(".x-user").lastChild.textContent = `${name}${role ? ` · ${role}` : ""}`;
+            $("#mew").hidden = false;
+            hide();
+            if (/access_token|type=/.test(location.hash)) history.replaceState(null, "", pageUrl());
+            render();
+            pull();
+          } catch (err) {
+            console.warn("GrowthMonk auth:", err);
+            show("signin"); fail($("#authcard form"), `Couldn't open your workspace: ${err?.message || "please try again."}`);
+          } finally { entering = false; }
+        }
+        async function submit(form) {
+          const d = Object.fromEntries(new FormData(form)), view = form.dataset.view, btn = form.querySelector(".x-btn");
+          const email = (d.email || "").trim().toLowerCase();
+          form.querySelector(".x-err").hidden = true;
+          if ("email" in d && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail(form, "Enter a valid email address.");
+          if ("password" in d && view !== "signin" && d.password.length < 6) return fail(form, "Use at least 6 characters for the password.");
+          if ("password" in d && !d.password) return fail(form, "Enter your password.");
+          if (view === "signup" && (d.name || "").trim().length < 2) return fail(form, "Enter your full name.");
+          if (view === "signup" && !(d.ws || "").trim()) return fail(form, "Name your workspace.");
+          btn.disabled = true;
+          try {
+            if (view === "signin") {
+              const { data, error } = await sb.auth.signInWithPassword({ email, password: d.password }); if (error) throw error;
+              await enter(data.user);
+            } else if (view === "signup") {
+              const ws = d.ws.trim();
+              const { data, error } = await sb.auth.signUp({ email, password: d.password, options: { data: { full_name: d.name.trim() }, emailRedirectTo: pageUrl() } }); if (error) throw error;
+              if (!data.session) { store.set(ws); show("signin", "Check your email to confirm, then sign in."); return; }
+              await enter(data.user, ws);
+            } else if (view === "forgot") {
+              const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: pageUrl() }); if (error) throw error;
+              show("signin", "If that email has an account, a reset link is on its way.");
+            } else if (view === "reset") {
+              const { data, error } = await sb.auth.updateUser({ password: d.password }); if (error) throw error;
+              recovering = false; history.replaceState(null, "", pageUrl());
+              await enter(data.user);
+              toast("Password updated.");
+            }
+          } catch (err) { if (form.isConnected) fail(form, err?.message || "Something went wrong. Please try again."); }
+          finally { if (btn.isConnected) btn.disabled = false; }
+        }
+        async function signOut() {
+          $("#medrop").hidden = true; $("#me").setAttribute("aria-expanded", "false");
+          try { await sb.auth.signOut(); } catch (err) { console.warn("GrowthMonk auth:", err); }
+          window.gmWorkspaceId = undefined;
+          state.contacts.length = 0; state.companies.length = 0;
+          closeDrawer(); document.querySelectorAll(".x-modal").forEach((m) => m.remove());
+          show("signin");
+        }
+        function init() {
+          $("#authcard").addEventListener("submit", (e) => { e.preventDefault(); submit(e.target); });
+          $("#authcard").addEventListener("click", (e) => { const b = e.target.closest("[data-av]"); if (b) show(b.dataset.av); });
+          $("#me").addEventListener("click", () => { const d = $("#medrop"); d.hidden = !d.hidden; $("#me").setAttribute("aria-expanded", String(!d.hidden)); });
+          document.addEventListener("click", (e) => { if (!e.target.closest(".x-mew")) { $("#medrop").hidden = true; $("#me").setAttribute("aria-expanded", "false"); } });
+          document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#medrop").hidden) { $("#medrop").hidden = true; $("#me").setAttribute("aria-expanded", "false"); $("#me").focus(); } });
+          $("#signout").addEventListener("click", signOut);
+          sb.auth.onAuthStateChange((event) => {
+            // Defer: Supabase calls inside this callback can deadlock
+            if (event === "PASSWORD_RECOVERY") { recovering = true; setTimeout(() => show("reset"), 0); }
+          });
+          if (recovering) show("reset");
+          sb.auth.getSession().then(({ data, error }) => {
+            if (recovering) return;
+            if (error || !data?.session) show("signin"); else enter(data.session.user);
+          }).catch(() => show("signin"));
+        }
+        return { init };
+      })();
+      if (db.demo) render(); else gmAuth.init();
     </script>
   </body>
 </html>
