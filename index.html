@@ -403,8 +403,12 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       // Data layer for contacts and companies: in-memory sample arrays in demo mode, Supabase when configured
       const db = (() => {
         const TABLES = ["contacts", "companies"];
+        const DOC_TABLES = ["tickets", "forms", "landing_pages", "campaigns", "segments", "automations", "surveys", "kb_articles"];
         const sb = () => window.gmSupabase || null;
         const check = (t) => { if (!TABLES.includes(t)) throw new Error(`db: unknown table "${t}"`); };
+        const checkDoc = (t) => { if (!DOC_TABLES.includes(t)) throw new Error(`db: unknown document table "${t}"`); };
+        // Document ids are stored as text; numeric ones come back as numbers so the app's id comparisons keep working
+        const docId = (id) => (/^\d+$/.test(String(id)) ? Number(id) : id);
         const ws = () => window.gmWorkspaceId;
         const fail = (error) => { if (error) throw error; };
         return {
@@ -434,12 +438,59 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
             const { error } = await sb().from(table).delete().eq("id", id).eq("workspace_id", ws()); fail(error);
             return true;
           },
+          // Document tables: rows are { id (text), workspace_id, data (jsonb) }; no-ops in demo mode
+          async loadDocs(table) {
+            checkDoc(table);
+            if (!sb()) return [];
+            const { data, error } = await sb().from(table).select("id, data").eq("workspace_id", ws()); fail(error);
+            return (data || []).map((r) => { const d = { ...(r.data || {}) }; d.id = docId(d.id ?? r.id); return d; });
+          },
+          async saveDoc(table, obj) {
+            checkDoc(table);
+            if (!sb()) return obj;
+            if (obj.id == null || obj.id === "") obj.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+            const id = String(obj.id);
+            const { error } = await sb().from(table).upsert({ id, workspace_id: ws(), data: { ...obj, id } }); fail(error);
+            return obj;
+          },
+          async removeDoc(table, id) {
+            checkDoc(table);
+            if (!sb()) return true;
+            const { error } = await sb().from(table).delete().eq("id", String(id)).eq("workspace_id", ws()); fail(error);
+            return true;
+          },
         };
       })();
       // Fill gaps in rows from Supabase so every screen can render them
       const normContact = (r) => ({ score: 0, owner: "Growth Monk", stage: "Lead", company: "—", email: "", name: "", m: 0, acts: [], ...r });
       const normCompany = (r) => ({ domain: "—", industry: "—", city: "—", name: "", ...r });
       const dbErr = (err) => { console.warn("GrowthMonk db:", err); toast(`Couldn't save: ${err?.message || "please try again."}`); };
+      // Document persistence: state key → Supabase table. persist saves now; persistSoon debounces builder saves by 600 ms
+      const DOCS = { tickets: "tickets", forms: "forms", lps: "landing_pages", campaigns: "campaigns", segs: "segments", flows: "automations", surveys: "surveys", kb: "kb_articles" };
+      const persist = (table, obj) => { if (!obj || db.demo) return; db.saveDoc(table, obj).catch(dbErr); };
+      const removeDoc = (table, id) => { if (db.demo) return; db.removeDoc(table, id).catch(dbErr); };
+      const persistTimers = {};
+      const persistSoon = (table, obj) => {
+        if (!obj || db.demo) return;
+        const k = `${table}:${obj.id}`;
+        clearTimeout(persistTimers[k]);
+        persistTimers[k] = setTimeout(() => { delete persistTimers[k]; persist(table, obj); }, 600);
+      };
+      async function pullDocs() {
+        if (db.demo) return;
+        const keys = Object.keys(DOCS), newestFirst = ["tickets", "forms", "lps", "campaigns", "flows"];
+        const res = await Promise.allSettled(keys.map((k) => db.loadDocs(DOCS[k])));
+        let failed = 0;
+        keys.forEach((k, i) => {
+          if (res[i].status !== "fulfilled") { failed++; console.warn("GrowthMonk db:", res[i].reason); return; }
+          const rows = res[i].value.sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
+          if (newestFirst.includes(k)) rows.reverse();
+          state[k].splice(0, state[k].length, ...rows);
+        });
+        segSync();
+        if (failed) toast("Couldn't load some of your workspace data. Please refresh.");
+        render();
+      }
       const ui = { q: "", stage: "", sort: "m", dir: 1, page: 0 };
       let charts = [];
 
@@ -483,9 +534,9 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       function dashboard(v) {
         const h = new Date().getHours(), greet = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
         state.kpis[3][1] = String(state.tickets.filter((t) => t.status !== "Closed").length);
-        if (state.surveys[0].type === "CSAT") state.kpis[5][1] = svFig(state.surveys[0]);
+        if (state.surveys[0]?.type === "CSAT") state.kpis[5][1] = svFig(state.surveys[0]);
         state.channels = TCH.map((n, i) => [n, state.tickets.filter((t) => t.ch === n).length, ["var(--x-primary)", "var(--x-chart)", "var(--x-c3)"][i]]);
-        const total = state.channels.reduce((a, c) => a + c[1], 0), pct = (p) => Math.round((p / total) * 100);
+        const total = state.channels.reduce((a, c) => a + c[1], 0), pct = (p) => Math.round((p / (total || 1)) * 100);
         v.innerHTML = `<h1>${greet}, Growth Monk</h1><p class="x-sub">Here is how marketing and service are doing this week.</p>
           <div class="x-grid">
             <div class="x-card x-s12" id="checklist">${checklistHTML()}</div>
@@ -552,7 +603,36 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         const rows = state.companies.map((c) => ({ ...c, n: state.contacts.filter((p) => p.company === c.name).length })).sort((a, b) => a.name.localeCompare(b.name));
         v.innerHTML = `<h1>Companies</h1><p class="x-sub">${rows.length} companies, derived from your contacts.</p><div class="x-card"><div class="x-scroll">${table([
           { label: "Name", render: (r) => person(r.name) }, { label: "Domain", render: (r) => `<span class="x-muted">${esc(r.domain)}</span>` }, { label: "Industry", render: (r) => esc(r.industry) },
-          { label: "City", render: (r) => esc(r.city) }, { label: "Contacts", render: (r) => `<a class="x-tag" href="#/contacts" data-co="${esc(r.name)}">${r.n} ${r.n === 1 ? "contact" : "contacts"}</a>` }], rows)}</div></div>`;
+          { label: "City", render: (r) => esc(r.city) }, { label: "Contacts", render: (r) => `<a class="x-tag" href="#/contacts" data-co="${esc(r.name)}">${r.n} ${r.n === 1 ? "contact" : "contacts"}</a>` },
+          { label: "", render: (r) => `<span class="x-row" style="margin:0;flex-wrap:nowrap"><button class="x-btn x-btn--ghost" data-coe="${esc(r.id)}" aria-label="Edit ${esc(r.name)}">Edit</button><button class="x-btn x-btn--ghost" data-cod="${esc(r.id)}" aria-label="Delete ${esc(r.name)}">Delete</button></span>` }], rows)}</div></div>`;
+      }
+      function editCompany(id) {
+        const co = state.companies.find((x) => x.id == id);
+        if (!co) return;
+        const f = (label, name, ph) => `<label>${label}<input name="${name}" value="${esc(co[name] === "—" ? "" : co[name] ?? "")}" placeholder="${ph}" ${name === "name" ? "required" : ""} /></label>`;
+        modal("Edit company", f("Name", "name", "e.g. Bloom Organics") + f("Domain", "domain", "e.g. bloomorganics.in") + f("Industry", "industry", "e.g. Retail") + f("City", "city", "e.g. Pune"), (d) => {
+          const name = d.name.trim(), old = co.name;
+          if (!name) return "Enter the company name.";
+          if (state.companies.some((c) => c !== co && c.name.toLowerCase() === name.toLowerCase())) return "Another company already has this name.";
+          const patch = { name, domain: d.domain.trim() || "—", industry: d.industry.trim() || "—", city: d.city.trim() || "—" };
+          db.update("companies", co.id, patch).then(async (r) => {
+            if (r && r !== co) Object.assign(co, normCompany(r));
+            if (name !== old) {
+              const moved = state.contacts.filter((c) => c.company === old);
+              moved.forEach((c) => (c.company = name));
+              if (!db.demo) await Promise.all(moved.map((c) => db.update("contacts", c.id, { company: name })));
+            }
+            refresh(); toast(`${name} saved.`);
+          }).catch(dbErr);
+        }, db.demo ? "Saved in this session only." : "Saved to your workspace.");
+      }
+      function deleteCompany(id) {
+        const co = state.companies.find((x) => x.id == id);
+        if (!co || !confirm(`Delete ${co.name}? This can't be undone. Its contacts stay in Contacts.`)) return;
+        db.remove("companies", co.id).then(() => {
+          if (!db.demo) { const i = state.companies.indexOf(co); if (i >= 0) state.companies.splice(i, 1); }
+          refresh(); toast(`${co.name} deleted.`);
+        }).catch(dbErr);
       }
       const cur = () => location.hash.slice(2) || "dashboard";
       const refresh = () => { const views = { contacts: contactsView, companies: companiesView }; if (views[cur()]) views[cur()]($("#view")); };
@@ -681,6 +761,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (SEGS[name] && name !== old?.name) { toast("A segment with this name already exists."); return $('[data-sg="name"]').focus(); }
         Object.assign(s, { name, ids: s.type === "Static" ? live(s).map((c) => c.id) : undefined });
         if (old) state.segs[state.segs.indexOf(old)] = s; else state.segs.push(Object.assign(s, { id: Date.now() }));
+        persist("segments", s);
         segSync(); ui.seg = null; segList($("#view")); toast(`Segment “${name}” saved · ${plural(members(s).length)}.`);
       }
       const openSeg = (id) => { const s = state.segs.find((x) => x.id == id); if (s) { ui.seg = structuredClone(s); segEdit($("#view")); $("#view").scrollTop = 0; } };
@@ -756,6 +837,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         const c = Object.assign(ui.camp, { status, when: null, ...extra }), i = state.campaigns.findIndex((x) => x.id === c.id);
         if (!c.name.trim()) c.name = c.subject.trim() || "Untitled campaign";
         if (i >= 0) state.campaigns[i] = c; else state.campaigns.unshift(Object.assign(c, { id: Date.now() }));
+        persistSoon("campaigns", c);
         ui.camp = null; campList($("#view"));
       }
       function campSend() {
@@ -853,7 +935,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         const i = +a.dataset.i, act = a.dataset.fact;
         if (act === "new") { ui.form = { id: 0, name: "", views: 0, subs: 0, fields: fld("text:Full name*|email:Email*") }; ui.ftab = "build"; formEdit(v, "[data-fn]"); }
         else if (act === "back") { ui.form = null; formList(v); }
-        else if (act === "save") { if (!f.name.trim()) f.name = "Untitled form"; const k = state.forms.findIndex((x) => x.id === f.id); if (k >= 0) state.forms[k] = f; else state.forms.unshift(Object.assign(f, { id: Date.now() })); ui.form = null; formList(v); toast("Form saved."); }
+        else if (act === "save") { if (!f.name.trim()) f.name = "Untitled form"; const k = state.forms.findIndex((x) => x.id === f.id); if (k >= 0) state.forms[k] = f; else state.forms.unshift(Object.assign(f, { id: Date.now() })); persist("forms", f); ui.form = null; formList(v); toast("Form saved."); }
         else if (act === "tab") { ui.ftab = a.dataset.t; formEdit(v, `[data-t="${a.dataset.t}"]`); }
         else if (act === "copy") copyText(snip(f));
         else if (act === "add") { f.fields.push(fld(`${a.dataset.t}:${FT[a.dataset.t][0]} field`)[0]); formEdit(v, `[data-fl="${f.fields.length - 1}"]`); }
@@ -871,7 +953,9 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         else return;
         $("#fpw").innerHTML = prevHTML(f);
       });
-      function submitForm(form, f, pre = "") {
+      // Validates, then records the submission and calls done() on success. Demo: in memory, synchronously.
+      // Supabase: the submit_form RPC creates the contact; errors show inline in the form.
+      function submitForm(form, f, pre = "", source = "form", done = () => {}) {
         const el = form.elements;
         let bad = null;
         f.fields.forEach((x, i) => {
@@ -883,23 +967,63 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (bad) { bad.focus(); return false; }
         const get = (t, re) => { const k = f.fields.findIndex((x) => x.t === t && (!re || re.test(x.label))); return k < 0 ? "" : el["f" + k].value.trim(); };
         const email = get("email").toLowerCase(), name = get("text", /name/i) || get("text") || email.split("@")[0] || "New lead", fname = f.name || "Untitled form";
+        const count = () => { f.subs++; f.views++; const s = state.forms.find((x) => x.id === f.id); if (s && s !== f) Object.assign(s, { subs: f.subs, views: f.views }); return s; };
+        if (window.gmSupabase) { submitRemote(form, f, source, email, fname, count, done); return false; }
         let company = get("text", /company|organi/i) || "—";
         const co = state.companies.find((c) => c.name.toLowerCase() === company.toLowerCase());
-        if (co) company = co.name; else if (company !== "—") state.companies.push({ name: company, domain: email.split("@")[1] || "—", industry: "—", city: "—" });
+        if (co) company = co.name; else if (company !== "—") state.companies.push({ id: Date.now(), name: company, domain: email.split("@")[1] || "—", industry: "—", city: "—" });
         state.contacts.unshift({ id: Date.now(), name, email, company, stage: "Lead", score: 10, owner: "Growth Monk", m: 0, acts: [[`Submitted the ${fname} form`, 0], ["Contact created", 0]] });
         state.activity.unshift([`${esc(name)} submitted the ${esc(fname)} form`, "Form", "Just now"]); state.activity.length = 5;
         fire("created", state.contacts[0]); fire("form", state.contacts[0], fname);
-        f.subs++; f.views++;
-        const s = state.forms.find((x) => x.id === f.id); if (s && s !== f) Object.assign(s, { subs: f.subs, views: f.views });
+        count();
+        done();
         return true;
+      }
+      async function submitRemote(form, f, source, email, fname, count, done) {
+        const el = form.elements, btn = form.querySelector(".x-ebtn");
+        let errP = form.querySelector("[data-sferr]");
+        if (!errP) { errP = document.createElement("p"); errP.className = "x-err"; errP.setAttribute("role", "alert"); errP.dataset.sferr = ""; btn.before(errP); }
+        errP.hidden = true;
+        // Map fields: name (or first/last), email and phone by type and label; every other field by its label
+        const val = (k) => (f.fields[k].t === "check" ? el["f" + k].checked : el["f" + k].value.trim());
+        const ix = (t, re, not) => f.fields.findIndex((x) => x.t === t && (!re || re.test(x.label)) && (!not || !not.test(x.label)));
+        const fi = ix("text", /first/i), li = ix("text", /last|surname/i), ni = ix("text", /name/i, /first|last|surname|compan|organi/i), ei = ix("email"), pi = ix("phone");
+        const used = new Set([fi, li, ni, ei, pi].filter((k) => k >= 0));
+        let first = fi >= 0 ? val(fi) : "", last = li >= 0 ? val(li) : "";
+        if (fi < 0 && li < 0 && ni >= 0) { const parts = val(ni).split(/\s+/).filter(Boolean); first = parts.shift() || ""; last = parts.join(" "); }
+        const data = { first_name: first, last_name: last, email, phone: pi >= 0 ? val(pi) : "" };
+        f.fields.forEach((x, k) => { if (used.has(k)) return; let key = (x.label || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || `field_${k + 1}`; while (key in data) key += "_"; data[key] = val(k); });
+        btn.disabled = true;
+        try {
+          const { error } = await window.gmSupabase.rpc("submit_form", { p_form_id: String(f.id), p_source: source, p_data: data });
+          if (error) throw error;
+        } catch (err) {
+          console.warn("GrowthMonk submit_form:", err);
+          errP.textContent = `Couldn't submit the form: ${err?.message || "please try again."}`; errP.hidden = false;
+          if (btn.isConnected) btn.disabled = false;
+          return;
+        }
+        if (btn.isConnected) btn.disabled = false;
+        const s = count();
+        persist("forms", s || f);
+        const who = [first, last].filter(Boolean).join(" ") || email.split("@")[0] || "New lead";
+        state.activity.unshift([`${esc(who)} submitted the ${esc(fname)} form`, "Form", "Just now"]); state.activity.length = 5;
+        try {
+          const cs = await db.list("contacts");
+          state.contacts.splice(0, state.contacts.length, ...cs.map(normContact));
+          const c = email && state.contacts.find((x) => x.email === email);
+          if (c) { fire("created", c); fire("form", c, fname); }
+        } catch (err) { console.warn("GrowthMonk db:", err); toast("Submitted, but couldn't reload contacts."); }
+        done();
       }
       $("#view").addEventListener("submit", (e) => {
         if (e.target.id !== "fprev") return;
         e.preventDefault();
         const f = ui.form;
-        if (!submitForm(e.target, f)) return;
-        $("#fs").textContent = fstat(f); $("#fpw").innerHTML = prevHTML(f);
-        toast("Submission received. Contact created.");
+        submitForm(e.target, f, "", "form_preview", () => {
+          if (ui.form === f && $("#fpw")) { $("#fs").textContent = fstat(f); $("#fpw").innerHTML = prevHTML(f); }
+          toast("Submission received. Contact created.");
+        });
       });
       // Marketing: landing pages. SEC: type → [label, defaults, editable fields]
       const SEC = {
@@ -922,7 +1046,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       const secHTML = (s, pre) => ({
         hero: () => `<header class="x-lph"><h1>${esc(s.h)}</h1><p>${esc(s.p)}</p><button type="button" class="x-ebtn" data-lpgo>${esc(s.b)}</button></header>`,
         features: () => `<section class="x-lpf">${[1, 2, 3].map((n) => `<div><b>${esc(s["a" + n])}</b><span>${esc(s["d" + n])}</span></div>`).join("")}</section>`,
-        form: () => `<section>${prevHTML(state.forms.find((f) => f.id == s.form) || state.forms[0], pre)}</section>`,
+        form: () => { const f = state.forms.find((x) => x.id == s.form) || state.forms[0]; return `<section>${f ? prevHTML(f, pre) : `<p class="x-muted" style="text-align:center">Create a form on the Forms screen to show it here.</p>`}</section>`; },
         testi: () => `<figure class="x-lpq"><blockquote>${esc(s.q)}</blockquote><figcaption>${esc(s.who)}</figcaption></figure>`,
         footer: () => `<footer class="x-lpft">${esc(s.text)}</footer>`,
       })[s.t]();
@@ -964,13 +1088,14 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         Object.assign(p, { name: p.name.trim() || "Untitled page", status });
         const k = state.lps.findIndex((x) => x.id === p.id);
         if (k < 0) { p.id = Date.now(); state.lps.unshift(structuredClone(p)); } else state.lps[k] = structuredClone(p);
+        persistSoon("landing_pages", state.lps[k < 0 ? 0 : k]);
         ui.lpauto = false;
         lpEdit($("#view"), `[data-lact="${status === "Published" ? "pub" : "draft"}"]`);
         toast(status === "Published" ? `Published at growthmonk.app/p/${p.slug}` : "Draft saved.");
       }
       function lpLive() {
         const p = ui.lp, back = document.activeElement, el = document.createElement("div");
-        const bump = (k) => { p[k]++; const s = state.lps.find((x) => x.id === p.id); if (s) s[k]++; if ($("#lps")) $("#lps").innerHTML = lpStat(p); };
+        const bump = (k) => { p[k]++; const s = state.lps.find((x) => x.id === p.id); if (s) { s[k]++; persistSoon("landing_pages", s); } if ($("#lps")) $("#lps").innerHTML = lpStat(p); };
         bump("views");
         el.className = "x-lpo"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-label", `${p.name || "Untitled page"}, live view`);
         el.innerHTML = `<div class="x-lpbar"><span>growthmonk.app/p/${esc(p.slug || "…")}${p.status === "Draft" ? " · Draft preview" : ""}</span><button class="x-btn x-btn--ghost" data-lpx>Close</button></div><div class="x-lp">${lpHTML(p, "lv")}</div>`;
@@ -979,10 +1104,12 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         el.addEventListener("submit", (e) => {
           e.preventDefault();
           const fe = e.target, f = state.forms.find((x) => x.id == fe.dataset.fid);
-          if (!f || !submitForm(fe, f, fe.id.slice(0, -5))) return;
-          bump("subs");
-          fe.outerHTML = `<div class="x-email x-pform" role="status"><h3>Thank you!</h3><p>We got your details and will be in touch soon.</p></div>`;
-          toast("Submission received. Lead created in Contacts.");
+          if (!f) return;
+          submitForm(fe, f, fe.id.slice(0, -5), `landing_page:${p.slug || p.id}`, () => {
+            bump("subs");
+            if (fe.isConnected) fe.outerHTML = `<div class="x-email x-pform" role="status"><h3>Thank you!</h3><p>We got your details and will be in touch soon.</p></div>`;
+            toast("Submission received. Lead created in Contacts.");
+          });
         });
         document.addEventListener("keydown", key);
         document.body.appendChild(el);
@@ -1068,7 +1195,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
             ${b ? "" : `<select data-tf="st" aria-label="Filter by status">${opts(TST, f.st, "All statuses")}</select>`}<select data-tf="pr" aria-label="Filter by priority">${opts(PRI, f.pr, "All priorities")}</select><select data-tf="ow" aria-label="Filter by owner">${opts(AGENTS, f.ow, "All owners")}</select></div><div id="tk"></div></div>`;
         renderTk();
       }
-      const setTk = (t, k, val) => { if (t[k] === val) return; t[k] = val; t.th.push({ k: "e", text: `${{ status: "Status", pri: "Priority", owner: "Owner" }[k]} changed to ${val}`, at: Date.now() }); if (k === "status" && val === "Closed") svAuto(t); renderTk(); };
+      const setTk = (t, k, val) => { if (t[k] === val) return; t[k] = val; t.th.push({ k: "e", text: `${{ status: "Status", pri: "Priority", owner: "Owner" }[k]} changed to ${val}`, at: Date.now() }); if (k === "status" && val === "Closed") svAuto(t); persist("tickets", t); renderTk(); };
       function openTicket(id) {
         const t = tget(id); if (!t) return;
         closeDrawer();
@@ -1100,7 +1227,9 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
           const text = e.target.msg.value.trim();
           if (!text) return e.target.msg.focus();
           t.th.push({ k: note ? "n" : "a", who: "Growth Monk", text, at: Date.now() });
+          const was = t.status;
           if (!note) setTk(t, "status", "Waiting on customer");
+          if (t.status === was) persist("tickets", t);
           sync("textarea"); toast(note ? "Internal note added." : "Reply sent. Waiting on customer.");
         });
         document.body.appendChild(el);
@@ -1114,8 +1243,10 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
           const subject = d.subject.trim(), text = d.desc.trim(), c = state.contacts.find((x) => x.id == d.cid);
           if (subject.length < 3) return "Enter a subject.";
           if (!text) return "Describe the issue.";
-          const id = Math.max(...state.tickets.map((t) => t.id)) + 1, at = Date.now();
+          if (!c) return "Add a contact first.";
+          const id = Math.max(1000, ...state.tickets.map((t) => +t.id || 0)) + 1, at = Date.now();
           state.tickets.unshift({ id, cid: c.id, pri: d.pri, status: "New", ch: d.ch, owner: "Unassigned", at, subject, th: [{ k: "c", who: c.name, text, at }] });
+          persist("tickets", state.tickets[0]);
           state.activity.unshift([`Ticket #${id} “${esc(subject)}” was created for ${esc(c.name)}`, "Help desk", "Just now"]); state.activity.length = 5;
           fire("ticket", c, d.pri);
           toast("Ticket created.");
@@ -1208,18 +1339,19 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (!title) { toast("Add a title first."); return $('[data-ke="title"]').focus(); }
         if (status === "Published" && !e.body.trim()) { toast("Write the article before publishing."); return $("#kbb").focus(); }
         let a = state.kb.find((x) => x.id === e.id);
-        if (!a) state.kb.push((a = { id: Math.max(...state.kb.map((x) => x.id)) + 1, views: 0, y: 0, n: 0 }));
+        if (!a) state.kb.push((a = { id: Math.max(0, ...state.kb.map((x) => +x.id || 0)) + 1, views: 0, y: 0, n: 0 }));
         Object.assign(a, { title, cat: e.cat, body: e.body, status });
+        persistSoon("kb_articles", a);
         if (status === "Published") state.checklist[4][1] = true;
         toast(status === "Published" ? `“${title}” published.` : `Draft “${title}” saved.`);
         kbGo("list", "[data-kq]");
       }
-      const kbOpen = (id) => { const a = state.kb.find((x) => x.id === id); a.views++; Object.assign(ui.kb, { id, voted: false }); kbGo("view", "[data-kb=back]"); };
+      const kbOpen = (id) => { const a = state.kb.find((x) => x.id === id); a.views++; persistSoon("kb_articles", a); Object.assign(ui.kb, { id, voted: false }); kbGo("view", "[data-kb=back]"); };
       $("#view").addEventListener("click", (e) => {
         if (cur() !== "knowledge-base") return;
         const t = (s) => e.target.closest(s), b = t("[data-kb]"), r = t("[data-aid]"), m = t("[data-kmd]"), vt = t("[data-kv]"), k = ui.kb;
         if (m) kbIns(m.dataset.kmd);
-        else if (vt) { const a = kget(); a[vt.dataset.kv]++; k.voted = true; $("#kfb").innerHTML = kfb(a); $("#kfb").focus(); }
+        else if (vt) { const a = kget(); a[vt.dataset.kv]++; persist("kb_articles", a); k.voted = true; $("#kfb").innerHTML = kfb(a); $("#kfb").focus(); }
         else if (r) kbOpen(+r.dataset.aid);
         else if (b) { const d = b.dataset.kb, a = d === "edit" && kget();
           if (d === "new" || d === "edit") { k.ed = a ? { id: a.id, title: a.title, cat: a.cat, body: a.body } : { id: null, title: "", cat: KCAT[0], body: "" }; kbGo("edit", '[data-ke="title"]'); }
@@ -1234,7 +1366,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       const tvals = (t) => ({ form: ["Any form", ...state.forms.map((f) => f.name)], stage: STAGES, ticket: PRI, seg: state.segs.map((s) => s.name) })[t];
       const trigTxt = (f) => TRIG[f.trig.t].replace("…", "") + (tvals(f.trig.t) ? (f.trig.t === "form" ? " · " : " ") + f.trig.v : "");
       const WS = { email: "Send email", wait: "Wait", if: "If/else branch", prop: "Update property", task: "Create task/ticket" }, BT = [["none", "Do nothing"], ["email", "Send email"], ["prop", "Update property"], ["task", "Create task/ticket"]];
-      const mk = (t) => ({ email: { t, camp: state.campaigns[0].id }, wait: { t, n: 2 }, if: { t, f: "Lead score", op: "greater than", v: "50", yes: { t: "none" }, no: { t: "none" } }, prop: { t, k: "stage", v: "MQL" }, task: { t, k: "Task", title: "Follow up with the contact" }, none: { t } })[t];
+      const mk = (t) => ({ email: { t, camp: state.campaigns[0]?.id ?? "" }, wait: { t, n: 2 }, if: { t, f: "Lead score", op: "greater than", v: "50", yes: { t: "none" }, no: { t: "none" } }, prop: { t, k: "stage", v: "MQL" }, task: { t, k: "Task", title: "Follow up with the contact" }, none: { t } })[t];
       const pvals = (k) => (k === "stage" ? STAGES : [...AGENTS.slice(0, 4), "Growth Monk"]);
       state.flows = [
         { id: 1, name: "Welcome new leads", on: true, enrolled: 318, last: Date.now() - 12 * MIN, trig: { t: "created", v: "" }, steps: [{ t: "email", camp: 2 }, { t: "wait", n: 2 }, { t: "if", f: "Lead score", op: "greater than", v: "50", yes: { t: "prop", k: "stage", v: "MQL" }, no: { t: "task", k: "Task", title: "Call the new lead" } }] },
@@ -1250,7 +1382,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (s.t === "wait") return `Wait ${s.n} ${s.n == 1 ? "day" : "days"}${dry ? ", skipped in test" : ""}`;
         if (s.t === "prop") { const l = s.k === "stage" ? "Lifecycle stage" : "Owner", old = c[s.k]; c[s.k] = s.v; c.m = 0; note(`${l} changed to ${s.v}`); act(`${fn}: ${c.name}'s ${l.toLowerCase()} changed from ${old} to ${s.v}`); return `${l}: ${old} → ${s.v}`; }
         if (s.t === "task") {
-          if (s.k === "Ticket") { const id = Math.max(...state.tickets.map((t) => t.id)) + 1, at = Date.now(); state.tickets.unshift({ id, cid: c.id, pri: "Medium", status: "New", ch: "Email", owner: "Unassigned", at, subject: s.title, th: [{ k: "e", text: `Created by ${fn}`, at }] }); act(`${fn} created ticket #${id} “${s.title}” for ${c.name}`); return `Created ticket #${id} “${s.title}”`; }
+          if (s.k === "Ticket") { const id = Math.max(1000, ...state.tickets.map((t) => +t.id || 0)) + 1, at = Date.now(); state.tickets.unshift({ id, cid: c.id, pri: "Medium", status: "New", ch: "Email", owner: "Unassigned", at, subject: s.title, th: [{ k: "e", text: `Created by ${fn}`, at }] }); persist("tickets", state.tickets[0]); act(`${fn} created ticket #${id} “${s.title}” for ${c.name}`); return `Created ticket #${id} “${s.title}”`; }
           note(`Task: ${s.title}`); act(`${fn} created task “${s.title}” for ${c.name}`); return `Created task “${s.title}”`;
         }
         return "No action";
@@ -1259,7 +1391,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         state.flows.filter((f) => f.on && f.trig.t === t && (!tvals(t) || f.trig.v === v || f.trig.v === "Any form")).forEach((f) => {
           const done = [];
           for (const s of f.steps) { if (s.t === "wait") { done.push(`now waiting ${s.n} ${s.n == 1 ? "day" : "days"}`); break; } done.push(exec(s.t === "if" ? s[test(c, s) ? "yes" : "no"] : s, c, f)); }
-          f.enrolled++; f.last = Date.now(); act(`“${f.name}” ran for ${c.name}: ${done.join("; ")}`);
+          f.enrolled++; f.last = Date.now(); persist("automations", f); act(`“${f.name}” ran for ${c.name}: ${done.join("; ")}`);
         });
       }
       function autos(v) { ui.flow ? flowEdit(v) : flowList(v); }
@@ -1318,7 +1450,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       $("#view").addEventListener("click", (e) => {
         if (cur() !== "automations") return;
         const t = (s) => e.target.closest(s), a = t("[data-wa]"), tg = t("[data-wtg]"), row = t("tr[data-flow]"), v = $("#view"), f = ui.flow;
-        if (tg) { const x = state.flows.find((y) => y.id == tg.dataset.wtg); x.on = !x.on; flowList(v); $(`[data-wtg="${x.id}"]`).focus(); return toast(`“${x.name}” is ${x.on ? "on" : "off"}.`); }
+        if (tg) { const x = state.flows.find((y) => y.id == tg.dataset.wtg); x.on = !x.on; persist("automations", x); flowList(v); $(`[data-wtg="${x.id}"]`).focus(); return toast(`“${x.name}” is ${x.on ? "on" : "off"}.`); }
         if (row) return openFlow(row.dataset.flow);
         if (!a || a.disabled) return;
         const d = a.dataset, i = +d.i;
@@ -1333,6 +1465,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
           if (!f.name.trim()) { toast("Name the workflow before saving."); return $("[data-wn]").focus(); }
           f.name = f.name.trim(); const k = state.flows.findIndex((x) => x.id === f.id);
           if (k >= 0) state.flows[k] = f; else state.flows.unshift(Object.assign(f, { id: Date.now() }));
+          persistSoon("automations", f);
           ui.flow = null; flowList(v); toast(`Workflow “${f.name}” saved · ${f.on ? "On" : "Off"}.`);
         }
       });
@@ -1398,7 +1531,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       const npsK = (n) => (n >= 9 ? "Promoter" : n >= 7 ? "Passive" : "Detractor");
       const rScore = (r, t) => r.s == null ? `<span class="x-muted">—</span>` : t === "NPS" ? `<b>${r.s}</b> <span class="x-tag" data-n="${npsK(r.s)}">${npsK(r.s)}</span>` : `<b>${r.s}</b><span class="x-muted">/5</span>`;
       const svDate = (at) => new Date(at).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-      const svTog = () => `<div class="x-headrow" style="align-items:center"><div><h2>Send automatically when a ticket is closed</h2><p class="x-sub" style="margin:0">Closing a Help desk ticket sends “${esc(state.surveys[0].name)}”. Replies are simulated.</p></div>${tog(state.svAuto, 'data-sva="auto"', "Send automatically when a ticket is closed")}</div>`;
+      const svTog = () => `<div class="x-headrow" style="align-items:center"><div><h2>Send automatically when a ticket is closed</h2><p class="x-sub" style="margin:0">Closing a Help desk ticket sends “${esc(state.surveys[0]?.name || "your first survey")}”. Replies are simulated.</p></div>${tog(state.svAuto, 'data-sva="auto"', "Send automatically when a ticket is closed")}</div>`;
       function surveys(v, focus) { ui.sv ? svEdit(v) : svList(v); if (focus) v.querySelector(focus)?.focus(); }
       function svList(v) {
         v.innerHTML = `<h1>Surveys</h1><p class="x-sub">${state.surveys.length} surveys · ${state.surveys.reduce((a, s) => a + s.resp.length, 0)} responses. Click a survey for its responses and question builder.</p>
@@ -1432,11 +1565,12 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       }
       function svAuto(t) {
         const s = state.surveys[0], c = tcon(t), k = Math.floor(Math.random() * 4);
-        if (!state.svAuto) return;
+        if (!state.svAuto || !s) return;
         const sc = s.type === "Open" ? null : (s.type === "NPS" ? [10, 9, 8, 6] : [5, 5, 4, 3])[k], out = s.type === "CSAT" ? 5 : 10;
         s.resp.push({ cid: c.id, s: sc, c: ["Quick and clear, thanks.", "", "Sorted in one reply.", "Took a while, but it's fixed."][k] || (sc == null ? "Thanks for the help." : ""), at: Date.now() });
         const what = sc == null ? "answered the survey" : `rated it ${sc} out of ${out}`;
         t.th.push({ k: "e", text: `${s.name} sent · ${c.name} ${what}`, at: Date.now() });
+        persist("surveys", s);
         state.activity.unshift([sc == null ? `${esc(c.name)} answered the survey for ticket #${t.id}` : `${esc(c.name)} rated ticket #${t.id} ${sc} out of ${out} · ${s.type} now ${svFig(s)}`, "Survey", "Just now"]); state.activity.length = 5;
       }
       $("#view").addEventListener("click", (e) => {
@@ -1447,12 +1581,12 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         else if (n) { ui.svPick = +n.dataset.svn; n.parentElement.querySelectorAll("button").forEach((b) => b.setAttribute("aria-checked", b === n)); }
       });
       $("#view").addEventListener("keydown", (e) => { const r = e.target.matches("[data-svid]") && e.target; if (r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); r.click(); } });
-      $("#view").addEventListener("input", (e) => { if (e.target.dataset.sv === "q") { svGet().q = e.target.value; $("#svq").textContent = e.target.value.trim() || "Your question"; } });
+      $("#view").addEventListener("input", (e) => { if (e.target.dataset.sv === "q") { svGet().q = e.target.value; persistSoon("surveys", svGet()); $("#svq").textContent = e.target.value.trim() || "Your question"; } });
       $("#view").addEventListener("change", (e) => {
         if (e.target.dataset.sv !== "type") return;
         const s = svGet(), n = s.resp.length;
         if (n && !confirm(`Changing the question type clears this survey's ${n} responses, since scores use a different scale. Continue?`)) { e.target.value = s.type; return; }
-        Object.assign(s, { type: e.target.value, resp: [] }); ui.svPick = null;
+        Object.assign(s, { type: e.target.value, resp: [] }); ui.svPick = null; persistSoon("surveys", s);
         surveys($("#view"), '[data-sv="type"]'); toast(`Question type set to ${SQT[s.type]}.`);
       });
       $("#view").addEventListener("submit", (e) => {
@@ -1461,7 +1595,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         const s = svGet(), f = e.target, c = f.c.value.trim(), err = f.querySelector(".x-err");
         const bad = s.type === "Open" ? !c && "Write an answer first." : ui.svPick == null && `Pick a score from ${s.type === "NPS" ? "0 to 10" : "1 to 5"}.`;
         if (bad) { err.textContent = bad; err.hidden = false; return (s.type === "Open" ? f.c : f.querySelector("[data-svn]")).focus(); }
-        s.resp.push({ cid: +f.cid.value, s: s.type === "Open" ? null : ui.svPick, c, at: Date.now() }); ui.svPick = null;
+        s.resp.push({ cid: +f.cid.value, s: s.type === "Open" ? null : ui.svPick, c, at: Date.now() }); ui.svPick = null; persist("surveys", s);
         surveys($("#view"), "#svf .x-btn"); toast(s.type === "Open" ? `Response added · ${s.resp.length} answers` : `Response added · ${s.type} now ${svFig(s)}`);
       });
       // Settings: account, users, lifecycle stages (shared STAGES), SLA targets (shared SLAH), billing
@@ -1559,7 +1693,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
           if (!s || STAGES.some((x, k) => k !== i && x.toLowerCase() === s.toLowerCase())) { e.target.value = old; return toast(s ? "That stage already exists." : "A stage needs a name."); }
           if (s === old) return;
           STAGES[i] = s; state.contacts.forEach((c) => c.stage === old && (c.stage = s)); if (ui.stage === old) ui.stage = s;
-          state.segs.forEach((g) => g.rules.forEach((r) => r.f === "Lifecycle stage" && r.v === old && (r.v = s)));
+          state.segs.forEach((g) => { let hit = false; g.rules.forEach((r) => r.f === "Lifecycle stage" && r.v === old && (r.v = s, hit = true)); if (hit) persist("segments", g); });
           toast(`Stage renamed to “${s}”.`);
         }
       });
@@ -1595,6 +1729,8 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
           const k = s.dataset.sort; ui.dir = ui.sort === k ? -ui.dir : 1; ui.sort = k; ui.page = 0; renderContacts(); $(`[data-sort="${k}"]`).focus();
         } else if (p && !p.disabled) { ui.page = +p.dataset.page; renderContacts(); }
         else if (t("[data-add]")) addContact();
+        else if (t("[data-coe]")) editCompany(t("[data-coe]").dataset.coe);
+        else if (t("[data-cod]")) deleteCompany(t("[data-cod]").dataset.cod);
         else if (o) openDrawer(o.dataset.open);
         else if (co) { Object.assign(ui, { q: co.dataset.co, stage: "", page: 0 }); $("#search").value = ui.q; }
       });
@@ -1676,6 +1812,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
             if (/access_token|type=/.test(location.hash)) history.replaceState(null, "", pageUrl());
             render();
             pull();
+            pullDocs();
           } catch (err) {
             console.warn("GrowthMonk auth:", err);
             show("signin"); fail($("#authcard form"), `Couldn't open your workspace: ${err?.message || "please try again."}`);
@@ -1717,6 +1854,8 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
           try { await sb.auth.signOut(); } catch (err) { console.warn("GrowthMonk auth:", err); }
           window.gmWorkspaceId = undefined;
           state.contacts.length = 0; state.companies.length = 0;
+          Object.values(persistTimers).forEach(clearTimeout); Object.keys(persistTimers).forEach((k) => delete persistTimers[k]);
+          Object.keys(DOCS).forEach((k) => (state[k].length = 0)); segSync();
           closeDrawer(); document.querySelectorAll(".x-modal").forEach((m) => m.remove());
           show("signin");
         }
@@ -1739,7 +1878,8 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         }
         return { init };
       })();
-      if (db.demo) render(); else gmAuth.init();
+      // Supabase mode starts with empty document tables (no sample data); pullDocs fills them after sign-in
+      if (db.demo) render(); else { Object.keys(DOCS).forEach((k) => (state[k].length = 0)); segSync(); gmAuth.init(); }
     </script>
   </body>
 </html>
