@@ -453,6 +453,12 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
             const { error } = await sb().from(table).upsert({ id, workspace_id: ws(), data: { ...obj, id } }); fail(error);
             return obj;
           },
+          async getDoc(table, id) {
+            checkDoc(table);
+            if (!sb()) return null;
+            const { data, error } = await sb().from(table).select("data").eq("id", String(id)).eq("workspace_id", ws()).maybeSingle(); fail(error);
+            return data ? data.data || {} : null;
+          },
           async removeDoc(table, id) {
             checkDoc(table);
             if (!sb()) return true;
@@ -467,15 +473,35 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       const dbErr = (err) => { console.warn("GrowthMonk db:", err); toast(`Couldn't save: ${err?.message || "please try again."}`); };
       // Document persistence: state key → Supabase table. persist saves now; persistSoon debounces builder saves by 600 ms
       const DOCS = { tickets: "tickets", forms: "forms", lps: "landing_pages", campaigns: "campaigns", segs: "segments", flows: "automations", surveys: "surveys", kb: "kb_articles" };
-      const persist = (table, obj) => { if (!obj || db.demo) return; db.saveDoc(table, obj).catch(dbErr); };
-      const removeDoc = (table, id) => { if (db.demo) return; db.removeDoc(table, id).catch(dbErr); };
+      // Every write in flight is tracked so flushSaves can wait for it
+      const inflight = new Set();
+      const track = (p) => { inflight.add(p); p.then(() => inflight.delete(p), () => inflight.delete(p)); return p; };
+      const persist = (table, obj) => { if (!obj || db.demo) return Promise.resolve(); return track(db.saveDoc(table, obj).catch(dbErr)); };
+      const removeDoc = (table, id) => { if (db.demo) return Promise.resolve(); return track(db.removeDoc(table, id).catch(dbErr)); };
       const persistTimers = {};
       const persistSoon = (table, obj) => {
         if (!obj || db.demo) return;
         const k = `${table}:${obj.id}`;
-        clearTimeout(persistTimers[k]);
-        persistTimers[k] = setTimeout(() => { delete persistTimers[k]; persist(table, obj); }, 600);
+        clearTimeout(persistTimers[k]?.t);
+        persistTimers[k] = { table, obj, t: setTimeout(() => { delete persistTimers[k]; persist(table, obj); }, 600) };
       };
+      const dropSoon = (table, id) => { const k = `${table}:${id}`; clearTimeout(persistTimers[k]?.t); delete persistTimers[k]; };
+      // Run every debounced save now and wait for all writes in flight (before sign-out, delete, or leaving the page)
+      async function flushSaves() {
+        Object.keys(persistTimers).forEach((k) => { const p = persistTimers[k]; clearTimeout(p.t); delete persistTimers[k]; persist(p.table, p.obj); });
+        await Promise.allSettled([...inflight]);
+      }
+      window.addEventListener("beforeunload", () => { flushSaves(); });
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushSaves(); });
+      // Delete a saved document after a confirm: Supabase first, then memory; demo mode only drops it from memory
+      function delDoc(key, item, label, after) {
+        if (!item || !confirm(`Delete “${label}”? This can't be undone.`)) return;
+        const list = state[key], drop = () => { const i = list.indexOf(item); if (i >= 0) list.splice(i, 1); after(); toast(`“${label}” deleted.`); };
+        if (db.demo) return drop();
+        dropSoon(DOCS[key], item.id);
+        flushSaves().then(() => track(db.removeDoc(DOCS[key], item.id))).then(drop, dbErr);
+      }
+      const none = (msg) => `<p class="x-sub" style="text-align:center;margin:32px 0">${msg}</p>`;
       async function pullDocs() {
         if (db.demo) return;
         const keys = Object.keys(DOCS), newestFirst = ["tickets", "forms", "lps", "campaigns", "flows"];
@@ -723,10 +749,10 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       function segments(v) { ui.seg ? segEdit(v) : segList(v); }
       function segList(v) {
         v.innerHTML = `<div class="x-headrow"><div><h1>Segments</h1><p class="x-sub">${state.segs.length} segments, counted live from your contacts. Click one to open it.</p></div><button class="x-btn" data-sga="new">+ New segment</button></div>
-          <div class="x-card"><div class="x-scroll">${table([
+          <div class="x-card">${state.segs.length ? `<div class="x-scroll">${table([
             { label: "Segment", render: (s) => `<span class="x-cn"><b>${esc(s.name)}</b><small>${esc((s.type === "Static" ? "Fixed list · " : "") + sumRules(s))}</small></span>` },
             { label: "Type", render: (s) => `<span class="x-tag" data-t="${s.type}">${s.type}</span>` },
-            { label: "Contacts", render: (s) => plural(members(s).length) }], state.segs, (s) => `class="x-click" data-seg="${s.id}" tabindex="0"`)}</div></div>`;
+            { label: "Contacts", render: (s) => plural(members(s).length) }], state.segs, (s) => `class="x-click" data-seg="${s.id}" tabindex="0"`)}</div>` : none("No segments yet. Create one to group contacts by rules.")}</div>`;
       }
       const slug = (f) => "sgl-" + f.replace(/\W/g, "");
       const SVALS = () => ({ "Lifecycle stage": STAGES, Company: state.companies.map((c) => c.name), City: [...new Set(state.companies.map((c) => c.city))], Owner: [...new Set(state.contacts.map((c) => c.owner))] });
@@ -742,7 +768,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       function segEdit(v, focus) {
         const s = ui.seg, vals = SVALS();
         v.innerHTML = `<button class="x-sort x-muted" data-sga="back">← All segments</button>
-          <div class="x-headrow"><div><h1>${s.id ? esc(s.name) : "New segment"}</h1><p class="x-sub">Add rules on the left; matching contacts update on the right. Click one to open it.</p></div><button class="x-btn" data-sga="save">Save segment</button></div>
+          <div class="x-headrow"><div><h1>${s.id ? esc(s.name) : "New segment"}</h1><p class="x-sub">Add rules on the left; matching contacts update on the right. Click one to open it.</p></div><div class="x-row" style="margin:0">${state.segs.some((x) => x.id === s.id) ? `<button class="x-btn x-btn--ghost" style="color:#B42318" data-sga="remove">Delete</button>` : ""}<button class="x-btn" data-sga="save">Save segment</button></div></div>
           <div class="x-ed"><div class="x-card">
             <label class="x-fl">Segment name<input data-sg="name" value="${esc(s.name)}" placeholder="e.g. Pune customers" /></label>
             <label class="x-fl">Type<select data-sg="type">${opts(["Active", "Static"], s.type)}</select></label>
@@ -776,6 +802,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         else if (act === "add") { s.rules.push(rule("Lifecycle stage", "is", "")); segEdit(v, `[data-sr="f"][data-i="${s.rules.length - 1}"]`); }
         else if (act === "del") { s.rules.splice(i, 1); segEdit(v, '[data-sga="add"]'); }
         else if (act === "save") segSave();
+        else if (act === "remove") delDoc("segs", state.segs.find((x) => x.id === s.id), s.name || "Untitled segment", () => { segSync(); if (cur() === "segments") { ui.seg = null; segList($("#view")); } });
       });
       $("#view").addEventListener("keydown", (e) => { const o = e.target.closest("tr[data-seg]"); if (o && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openSeg(o.dataset.seg); } });
       $("#view").addEventListener("input", (e) => {
@@ -801,13 +828,13 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       function campList(v) {
         const sent = state.campaigns.filter((c) => c.status === "Sent").length;
         v.innerHTML = `<div class="x-headrow"><div><h1>Email campaigns</h1><p class="x-sub">${state.campaigns.length} campaigns · ${sent} sent. Click one to open it.</p></div><button class="x-btn" data-cact="new">+ New campaign</button></div>
-          <div class="x-card"><div class="x-scroll">${table([
+          <div class="x-card">${state.campaigns.length ? `<div class="x-scroll">${table([
             { label: "Campaign", render: (r) => `<span class="x-cn"><b>${esc(r.name)}</b><small>${esc(r.subject || "No subject yet")}</small></span>` },
             { label: "Status", render: (r) => `<span class="x-cn">${chip(r.status)}${r.when ? `<small>${r.when}</small>` : ""}</span>` },
             { label: "Segment", render: (r) => esc(r.segment) },
             { label: "Recipients", render: (r) => dash(r.recipients, (n) => n.toLocaleString()) },
             { label: "Opens", render: (r) => dash(r.open, (n) => `${n}%`) },
-            { label: "Clicks", render: (r) => dash(r.click, (n) => `${n}%`) }], state.campaigns, (r) => `class="x-click" data-camp="${r.id}" tabindex="0"`)}</div></div>`;
+            { label: "Clicks", render: (r) => dash(r.click, (n) => `${n}%`) }], state.campaigns, (r) => `class="x-click" data-camp="${r.id}" tabindex="0"`)}</div>` : none("No campaigns yet. Create one to email your contacts.")}</div>`;
       }
       const mailHTML = (c) => `<div class="x-inbox"><b>${esc(c.subject || "Subject line")}</b><span>${esc(c.preview || "Preview text shows here in the inbox")}</span></div>
         <div class="x-email">${c.blocks.map((b) => (b.t === "h" ? `<h3>${esc(b.text)}</h3>` : b.t === "b" ? `<p><span class="x-ebtn">${esc(b.text)}</span></p>` : `<p>${esc(b.text).replace(/\n/g, "<br>")}</p>`)).join("") || `<p class="x-muted">Add a block to start your email.</p>`}<p class="x-efoot">GrowthMonk · You can unsubscribe at any time.</p></div>`;
@@ -819,7 +846,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         const c = ui.camp, ro = c.status === "Sent", r = ro ? "readonly" : "", last = c.blocks.length - 1;
         v.innerHTML = `<button class="x-sort x-muted" data-cact="back">← All campaigns</button>
           <div class="x-headrow"><div><h1>${c.id ? esc(c.name) : "New campaign"}</h1><p class="x-sub">${ro ? `Sent to ${esc(c.segment)} · read-only` : "Build the email on the left; the preview updates as you type."}</p></div>
-            ${ro ? chip("Sent") : `<div class="x-row" style="margin:0"><button class="x-btn x-btn--ghost" data-cact="draft">Save as draft</button><button class="x-btn" data-cact="send">Send…</button></div>`}</div>
+            <div class="x-row" style="margin:0">${state.campaigns.some((x) => x.id === c.id) ? `<button class="x-btn x-btn--ghost" style="color:#B42318" data-cact="remove">Delete</button>` : ""}${ro ? chip("Sent") : `<button class="x-btn x-btn--ghost" data-cact="draft">Save as draft</button><button class="x-btn" data-cact="send">Send…</button>`}</div></div>
           ${ro ? `<div class="x-grid">${[["Recipients", c.recipients.toLocaleString()], ["Opened", Math.round((c.recipients * c.open) / 100).toLocaleString()], ["Open rate", `${c.open}%`], ["Click rate", `${c.click}%`]].map(([l, f]) => `<div class="x-card x-kpi x-kpi--sf" style="grid-column:span 3"><div class="x-lab">${l}</div><div class="x-fig">${f}</div></div>`).join("")}</div>` : ""}
           <div class="x-ed"><div class="x-card">
             <label class="x-fl">Campaign name<input data-f="name" value="${esc(c.name)}" placeholder="e.g. November newsletter" ${r} /></label>
@@ -844,6 +871,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         const c = ui.camp;
         if (!c.subject.trim()) { toast("Add a subject line before sending."); return $('[data-f="subject"]').focus(); }
         if (!c.blocks.length) return toast("Add at least one block before sending.");
+        if (!SEGS[c.segment]) c.segment = "All contacts";
         const label = (s) => `${SEGS[s]()} ${SEGS[s]() === 1 ? "recipient" : "recipients"}`;
         const o = (s) => `<option ${s === c.segment ? "selected" : ""}>${esc(s)}</option>`, k = Object.keys(SEGS);
         modal("Send campaign", `<label>Segment<select name="segment" id="sseg">${k.slice(0, 3).map(o).join("")}<optgroup label="Segments">${k.slice(3).map(o).join("")}</optgroup></select></label><p class="x-sub" id="rc" aria-live="polite">${label(c.segment)}</p>`, (d) => {
@@ -870,6 +898,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         else if (act === "back") { ui.camp = null; campList(v); }
         else if (act === "draft") { campSave("Draft"); toast("Draft saved."); }
         else if (act === "send") campSend();
+        else if (act === "remove") delDoc("campaigns", state.campaigns.find((x) => x.id === c.id), c.name || "Untitled campaign", () => { if (cur() === "campaigns") { ui.camp = null; campList($("#view")); } });
         else if (act === "add") { c.blocks.push({ t: a.dataset.t, text: BL[a.dataset.t][1] }); campEdit(v, `[data-b="${c.blocks.length - 1}"]`); }
         else if (act === "del") { c.blocks.splice(i, 1); campEdit(v, ".x-tools .x-btn"); }
         else { const j = act === "up" ? i - 1 : i + 1; [c.blocks[i], c.blocks[j]] = [c.blocks[j], c.blocks[i]]; campEdit(v, `[data-cact="${act}"][data-i="${j}"]:not(:disabled), [data-b="${j}"]`); }
@@ -900,23 +929,27 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       function forms(v) { ui.form ? formEdit(v) : formList(v); }
       function formList(v) {
         v.innerHTML = `<div class="x-headrow"><div><h1>Forms</h1><p class="x-sub">${state.forms.length} forms · ${state.forms.reduce((a, f) => a + f.subs, 0).toLocaleString()} submissions. Click one to edit it.</p></div><button class="x-btn" data-fact="new">+ New form</button></div>
-          <div class="x-card"><div class="x-scroll">${table([
+          <div class="x-card">${state.forms.length ? `<div class="x-scroll">${table([
             { label: "Form", render: (r) => `<span class="x-cn"><b>${esc(r.name)}</b><small>${r.fields.filter((x) => x.req).length} required</small></span>` },
             { label: "Fields", render: (r) => r.fields.length },
             { label: "Views", render: (r) => r.views.toLocaleString() },
             { label: "Submissions", render: (r) => r.subs.toLocaleString() },
-            { label: "Conversion", render: conv }], state.forms, (r) => `class="x-click" data-form="${r.id}" tabindex="0"`)}</div></div>`;
+            { label: "Conversion", render: conv }], state.forms, (r) => `class="x-click" data-form="${r.id}" tabindex="0"`)}</div>` : none("No forms yet. Create one to capture leads.")}</div>`;
       }
       const prevHTML = (f, p = "") => `<form class="x-email x-pform" id="${p}fprev" data-fid="${f.id}" novalidate><h3>${esc(f.name || "Untitled form")}</h3>${f.fields.map((x, i) => {
           const a = `name="f${i}" aria-describedby="${p}pe${i}" ${x.req ? 'aria-required="true"' : ""}`, l = `${esc(x.label || FT[x.t][0])}${x.req ? '<i class="x-req" aria-hidden="true"> *</i>' : ""}`;
           return (x.t === "check" ? `<label class="x-fl x-fl--check"><input type="checkbox" ${a} /><b>${l}</b></label>`
             : `<label class="x-fl"><b>${l}</b>${x.t === "select" ? `<select ${a}><option value="">Choose…</option>${x.opts.split(",").map((o) => o.trim()).filter(Boolean).map((o) => `<option>${esc(o)}</option>`).join("")}</select>` : `<input type="${FT[x.t][1]}" ${a} />`}</label>`) + `<p class="x-err" id="${p}pe${i}" hidden></p>`;
         }).join("") || `<p class="x-muted">Add a field to start your form.</p>`}<button class="x-ebtn">Submit</button><p class="x-efoot">Powered by GrowthMonk · We never share your details.</p></form>`;
+      // Supabase: the submit_form RPC and the embed snippet need a saved form row, so an unsaved one can't be tried or shared
+      const formLocked = (f) => !db.demo && (!f.id || !state.forms.some((x) => x.id === f.id));
+      const fpHTML = (f) => (formLocked(f) ? prevHTML(f).replace('<button class="x-ebtn">', '<button class="x-ebtn" disabled title="Save the form first">') : prevHTML(f));
       function formEdit(v, focus) {
-        const f = ui.form, last = f.fields.length - 1;
+        const f = ui.form, last = f.fields.length - 1, lock = formLocked(f);
+        if (lock) ui.ftab = "build";
         v.innerHTML = `<button class="x-sort x-muted" data-fact="back">← All forms</button>
-          <div class="x-headrow"><div><h1 id="fh">${esc(f.name || "New form")}</h1><p class="x-sub" id="fs">${fstat(f)}</p></div><button class="x-btn" data-fact="save">Save form</button></div>
-          <div class="x-tools">${[["build", "Build"], ["embed", "Embed"]].map(([k, l]) => `<button class="x-btn x-btn--ghost x-tab" aria-pressed="${ui.ftab === k}" data-fact="tab" data-t="${k}">${l}</button>`).join("")}</div>
+          <div class="x-headrow"><div><h1 id="fh">${esc(f.name || "New form")}</h1><p class="x-sub" id="fs">${fstat(f)}</p></div><div class="x-row" style="margin:0">${state.forms.some((x) => x.id === f.id) ? `<button class="x-btn x-btn--ghost" style="color:#B42318" data-fact="remove">Delete</button>` : ""}<button class="x-btn" data-fact="save">Save form</button></div></div>
+          <div class="x-tools">${[["build", "Build"], ["embed", "Embed"]].map(([k, l]) => `<button class="x-btn x-btn--ghost x-tab" aria-pressed="${ui.ftab === k}" data-fact="tab" data-t="${k}" ${lock && k === "embed" ? 'disabled title="Save the form first"' : ""}>${l}</button>`).join("")}${lock ? `<span class="x-muted">Save the form first to preview or share it.</span>` : ""}</div>
           ${ui.ftab === "embed" ? `<div class="x-card"><h2>Embed this form</h2><p class="x-sub">Paste this snippet where the form should appear on your site.</p><pre class="x-code"><code>${esc(snip(f))}</code></pre><button class="x-btn" data-fact="copy">Copy</button></div>`
           : `<div class="x-ed" style="margin-top:4px"><div class="x-card">
             <label class="x-fl">Form name<input data-fn value="${esc(f.name)}" placeholder="e.g. Webinar signup" /></label>
@@ -924,7 +957,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
             <ol class="x-blocks">${f.fields.map((x, i) => `<li><div class="x-bhead"><span class="x-tag">${FT[x.t][0]}</span><label class="x-rq"><input type="checkbox" data-fr="${i}" ${x.req ? "checked" : ""} />Required</label><button class="x-ib" data-fact="up" data-i="${i}" ${i ? "" : "disabled"} aria-label="Move up">↑</button><button class="x-ib" data-fact="down" data-i="${i}" ${i < last ? "" : "disabled"} aria-label="Move down">↓</button><button class="x-ib" data-fact="del" data-i="${i}" aria-label="Delete field">✕</button></div>
               <input data-fl="${i}" value="${esc(x.label)}" aria-label="${FT[x.t][0]} field label" placeholder="Field label" />${x.t === "select" ? `<input data-fo="${i}" value="${esc(x.opts)}" aria-label="Dropdown options, comma separated" placeholder="Options, comma separated" style="margin-top:6px" />` : ""}</li>`).join("")}</ol>
             <div class="x-tools">${Object.entries(FT).map(([t, [l]]) => `<button class="x-btn x-btn--ghost" data-fact="add" data-t="${t}">+ ${l}</button>`).join("")}</div>
-          </div><div class="x-card x-mail"><h2>Live preview</h2><p class="x-sub">Try it: a valid submission creates a Lead in Contacts.</p><div id="fpw">${prevHTML(f)}</div></div></div>`}`;
+          </div><div class="x-card x-mail"><h2>Live preview</h2><p class="x-sub">${lock ? "Save the form first. Then a valid submission creates a Lead in Contacts." : "Try it: a valid submission creates a Lead in Contacts."}</p><div id="fpw">${fpHTML(f)}</div></div></div>`}`;
         if (focus) v.querySelector(focus)?.focus();
       }
       const openForm = (id) => { const f = state.forms.find((x) => x.id == id); if (f) { ui.form = structuredClone(f); ui.ftab = "build"; formEdit($("#view")); $("#view").scrollTop = 0; } };
@@ -937,7 +970,8 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         else if (act === "back") { ui.form = null; formList(v); }
         else if (act === "save") { if (!f.name.trim()) f.name = "Untitled form"; const k = state.forms.findIndex((x) => x.id === f.id); if (k >= 0) state.forms[k] = f; else state.forms.unshift(Object.assign(f, { id: Date.now() })); persist("forms", f); ui.form = null; formList(v); toast("Form saved."); }
         else if (act === "tab") { ui.ftab = a.dataset.t; formEdit(v, `[data-t="${a.dataset.t}"]`); }
-        else if (act === "copy") copyText(snip(f));
+        else if (act === "copy") { if (formLocked(f)) return toast("Save the form first."); copyText(snip(f)); }
+        else if (act === "remove") delDoc("forms", state.forms.find((x) => x.id === f.id), f.name || "Untitled form", () => { if (cur() === "forms") { ui.form = null; formList($("#view")); } });
         else if (act === "add") { f.fields.push(fld(`${a.dataset.t}:${FT[a.dataset.t][0]} field`)[0]); formEdit(v, `[data-fl="${f.fields.length - 1}"]`); }
         else if (act === "del") { f.fields.splice(i, 1); formEdit(v, ".x-blocks + .x-tools .x-btn"); }
         else { const j = act === "up" ? i - 1 : i + 1; [f.fields[i], f.fields[j]] = [f.fields[j], f.fields[i]]; formEdit(v, `[data-fact="${act}"][data-i="${j}"]:not(:disabled), [data-fl="${j}"]`); }
@@ -951,7 +985,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         else if (d.fo != null) f.fields[+d.fo].opts = e.target.value;
         else if (d.fr != null) f.fields[+d.fr].req = e.target.checked;
         else return;
-        $("#fpw").innerHTML = prevHTML(f);
+        $("#fpw").innerHTML = fpHTML(f);
       });
       // Validates, then records the submission and calls done() on success. Demo: in memory, synchronously.
       // Supabase: the submit_form RPC creates the contact; errors show inline in the form.
@@ -967,7 +1001,8 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (bad) { bad.focus(); return false; }
         const get = (t, re) => { const k = f.fields.findIndex((x) => x.t === t && (!re || re.test(x.label))); return k < 0 ? "" : el["f" + k].value.trim(); };
         const email = get("email").toLowerCase(), name = get("text", /name/i) || get("text") || email.split("@")[0] || "New lead", fname = f.name || "Untitled form";
-        const count = () => { f.subs++; f.views++; const s = state.forms.find((x) => x.id === f.id); if (s && s !== f) Object.assign(s, { subs: f.subs, views: f.views }); return s; };
+        // Demo mode counts the submission here; in Supabase mode submit_form counts it and the app only reads the new totals back
+        const count = (subs = f.subs + 1, views = f.views + 1) => { Object.assign(f, { subs, views }); const s = state.forms.find((x) => x.id === f.id); if (s && s !== f) Object.assign(s, { subs, views }); return s; };
         if (window.gmSupabase) { submitRemote(form, f, source, email, fname, count, done); return false; }
         let company = get("text", /company|organi/i) || "—";
         const co = state.companies.find((c) => c.name.toLowerCase() === company.toLowerCase());
@@ -995,6 +1030,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         f.fields.forEach((x, k) => { if (used.has(k)) return; let key = (x.label || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || `field_${k + 1}`; while (key in data) key += "_"; data[key] = val(k); });
         btn.disabled = true;
         try {
+          await flushSaves(); // the form row must exist before the RPC looks it up
           const { error } = await window.gmSupabase.rpc("submit_form", { p_form_id: String(f.id), p_source: source, p_data: data });
           if (error) throw error;
         } catch (err) {
@@ -1004,8 +1040,9 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
           return;
         }
         if (btn.isConnected) btn.disabled = false;
-        const s = count();
-        persist("forms", s || f);
+        // The RPC already added the submission; read the stored totals back instead of adding +1 and saving it again
+        try { const d = await db.getDoc("forms", f.id); if (d && Number.isFinite(+d.subs)) count(+d.subs, Number.isFinite(+d.views) ? +d.views : f.views); }
+        catch (err) { console.warn("GrowthMonk db:", err); }
         const who = [first, last].filter(Boolean).join(" ") || email.split("@")[0] || "New lead";
         state.activity.unshift([`${esc(who)} submitted the ${esc(fname)} form`, "Form", "Just now"]); state.activity.length = 5;
         try {
@@ -1020,8 +1057,9 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (e.target.id !== "fprev") return;
         e.preventDefault();
         const f = ui.form;
+        if (formLocked(f)) return toast("Save the form first.");
         submitForm(e.target, f, "", "form_preview", () => {
-          if (ui.form === f && $("#fpw")) { $("#fs").textContent = fstat(f); $("#fpw").innerHTML = prevHTML(f); }
+          if (ui.form === f && $("#fpw")) { $("#fs").textContent = fstat(f); $("#fpw").innerHTML = fpHTML(f); }
           toast("Submission received. Contact created.");
         });
       });
@@ -1054,19 +1092,19 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       function landing(v) { ui.lp ? lpEdit(v) : lpList(v); }
       function lpList(v) {
         v.innerHTML = `<div class="x-headrow"><div><h1>Landing pages</h1><p class="x-sub">${state.lps.length} pages · ${state.lps.filter((p) => p.status === "Published").length} published. Click one to edit it.</p></div><button class="x-btn" data-lact="new">+ New landing page</button></div>
-          <div class="x-card"><div class="x-scroll">${table([
+          <div class="x-card">${state.lps.length ? `<div class="x-scroll">${table([
             { label: "Page", render: (r) => `<b>${esc(r.name)}</b>` },
             { label: "Status", render: (r) => chip(r.status) },
             { label: "URL slug", render: (r) => `<span class="x-muted">/p/${esc(r.slug)}</span>` },
             { label: "Views", render: (r) => r.views.toLocaleString() },
             { label: "Submissions", render: (r) => r.subs.toLocaleString() },
-            { label: "Conversion", render: conv }], state.lps, (r) => `class="x-click" data-lp="${r.id}" tabindex="0"`)}</div></div>`;
+            { label: "Conversion", render: conv }], state.lps, (r) => `class="x-click" data-lp="${r.id}" tabindex="0"`)}</div>` : none("No landing pages yet. Create one to collect sign-ups.")}</div>`;
       }
       function lpEdit(v, focus) {
         const p = ui.lp, last = p.secs.length - 1, ib = (act, i, l, ch, off) => `<button class="x-ib" data-lact="${act}" data-i="${i}" ${off ? "disabled" : ""} aria-label="${l}">${ch}</button>`;
         v.innerHTML = `<button class="x-sort x-muted" data-lact="back">← All landing pages</button>
           <div class="x-headrow"><div><h1 id="lph">${esc(p.name || "New landing page")}</h1><p class="x-sub" id="lps">${lpStat(p)}</p></div>
-            <div class="x-tools"><button class="x-btn x-btn--ghost" data-lact="live">View live</button><button class="x-btn x-btn--ghost" data-lact="draft">Save draft</button><button class="x-btn" data-lact="pub">Publish</button></div></div>
+            <div class="x-tools">${state.lps.some((x) => x.id === p.id) ? `<button class="x-btn x-btn--ghost" style="color:#B42318" data-lact="remove">Delete</button>` : ""}<button class="x-btn x-btn--ghost" data-lact="live">View live</button><button class="x-btn x-btn--ghost" data-lact="draft">Save draft</button><button class="x-btn" data-lact="pub">Publish</button></div></div>
           <div class="x-ed" style="margin-top:4px"><div class="x-card">
             <label class="x-fl">Page title<input data-lt value="${esc(p.name)}" placeholder="e.g. Free CRM demo" /></label>
             <label class="x-fl">URL slug<input data-lsl value="${esc(p.slug)}" placeholder="e.g. free-crm-demo" aria-describedby="lpe" spellcheck="false" autocomplete="off" /></label>
@@ -1125,6 +1163,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         else if (act === "back") { ui.lp = null; lpList(v); }
         else if (act === "dev") { ui.lpdev = a.dataset.dv; $(".x-lpd").dataset.d = ui.lpdev; document.querySelectorAll('[data-lact="dev"]').forEach((b) => b.setAttribute("aria-pressed", b === a)); }
         else if (act === "live") lpLive();
+        else if (act === "remove") delDoc("lps", state.lps.find((x) => x.id === p.id), p.name || "Untitled page", () => { if (cur() === "landing-pages") { ui.lp = null; lpList($("#view")); } });
         else if (act === "draft" || act === "pub") lpSave(act === "pub" ? "Published" : "Draft");
         else if (act === "add") { p.secs.push(sec(a.dataset.t)); lpEdit(v, `[data-ls="${p.secs.length - 1}"]`); }
         else if (act === "del") { p.secs.splice(i, 1); lpEdit(v, ".x-blocks + .x-tools .x-btn"); }
@@ -1210,12 +1249,14 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
             ${[["status", "Status", TST], ["pri", "Priority", PRI], ["owner", "Owner", AGENTS]].map(([k, l, list]) => `<dt><label for="tk-${k}">${l}</label></dt><dd><select id="tk-${k}" data-k="${k}">${opts(list, t[k])}</select></dd>`).join("")}</dl>
           <h3>Conversation</h3><ol class="x-th">${t.th.map(msg).join("")}</ol>
           <form class="x-notef"><textarea name="msg" rows="4" placeholder="${esc(ph())}" aria-label="${note ? "Internal note" : "Reply"}"></textarea>
-            <div class="x-tkr"><label><input type="checkbox" id="tkn" ${note ? "checked" : ""} />Internal note</label>${t.status === "Closed" ? "" : `<button type="button" class="x-btn x-btn--ghost" data-tclose>Close ticket</button>`}<button class="x-btn" id="tksend">${note ? "Add note" : "Send"}</button></div></form></aside>`; };
+            <div class="x-tkr"><label><input type="checkbox" id="tkn" ${note ? "checked" : ""} />Internal note</label>${t.status === "Closed" ? "" : `<button type="button" class="x-btn x-btn--ghost" data-tclose>Close ticket</button>`}<button class="x-btn" id="tksend">${note ? "Add note" : "Send"}</button></div></form>
+          <button type="button" class="x-btn x-btn--ghost x-del" data-tdel>Delete ticket</button></aside>`; };
         const sync = (focus) => { draw(); renderTk(); el.querySelector(focus)?.focus(); };
         draw();
         el.addEventListener("click", (e) => {
           if (e.target === el || e.target.closest("[data-x]")) closeDrawer();
           else if (e.target.closest("[data-tclose]")) { setTk(t, "status", "Closed"); sync("[data-x]"); toast(`Ticket #${t.id} closed.`); }
+          else if (e.target.closest("[data-tdel]")) delDoc("tickets", t, `#${t.id} ${t.subject}`, () => { if ($("#drawer") === el) closeDrawer(); if (["help-desk", "ticket-board"].includes(cur())) helpdesk($("#view")); else if (cur() === "dashboard") render(); });
         });
         el.addEventListener("change", (e) => {
           const k = e.target.dataset.k, ta = el.querySelector("textarea");
@@ -1314,7 +1355,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       const kbPrev = () => { const e = ui.kb.ed; $("#kbpc").textContent = "Help center · " + e.cat; $("#kbpt").textContent = e.title.trim() || "Untitled article"; $("#kbpb").innerHTML = md(e.body) || `<p class="x-muted">Start writing to see the preview.</p>`; };
       function kb(v) {
         const k = ui.kb, a = kget(), e = k.ed;
-        if (k.mode === "view") v.innerHTML = `<div class="x-headrow" style="margin-bottom:16px"><button class="x-btn x-btn--ghost" data-kb="back">← All articles</button><button class="x-btn x-btn--ghost" data-kb="edit">Edit article</button></div>
+        if (k.mode === "view") v.innerHTML = `<div class="x-headrow" style="margin-bottom:16px"><button class="x-btn x-btn--ghost" data-kb="back">← All articles</button><div class="x-row" style="margin:0"><button class="x-btn x-btn--ghost" style="color:#B42318" data-kb="delete">Delete</button><button class="x-btn x-btn--ghost" data-kb="edit">Edit article</button></div></div>
           <article class="x-card x-kart"><p class="x-muted">Help center · ${a.cat}${a.status === "Draft" ? " · Draft, not visible to customers" : ""}</p><h1>${esc(a.title)}</h1><div class="x-md">${md(a.body)}</div>
           <div class="x-kfb" id="kfb" tabindex="-1" aria-live="polite">${kfb(a)}</div></article>`;
         else if (k.mode === "edit") { v.innerHTML = `<div class="x-headrow"><div><h1>${e.id ? "Edit article" : "New article"}</h1><p class="x-sub">Write on the left; the preview shows what customers will see.</p></div>
@@ -1355,7 +1396,9 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         else if (r) kbOpen(+r.dataset.aid);
         else if (b) { const d = b.dataset.kb, a = d === "edit" && kget();
           if (d === "new" || d === "edit") { k.ed = a ? { id: a.id, title: a.title, cat: a.cat, body: a.body } : { id: null, title: "", cat: KCAT[0], body: "" }; kbGo("edit", '[data-ke="title"]'); }
-          else if (d === "back") kbGo("list", "[data-kq]"); else kbSave(d); }
+          else if (d === "back") kbGo("list", "[data-kq]");
+          else if (d === "delete") { const a = kget(); delDoc("kb", a, a?.title || "Untitled article", () => { if (cur() === "knowledge-base") kbGo("list", "[data-kq]"); }); }
+          else kbSave(d); }
       });
       $("#view").addEventListener("input", (e) => { const d = e.target.dataset;
         if (d.kq != null) { ui.kb.q = e.target.value; $("#kbl").innerHTML = kbList(); }
@@ -1397,10 +1440,10 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       function autos(v) { ui.flow ? flowEdit(v) : flowList(v); }
       function flowList(v) {
         v.innerHTML = `<div class="x-headrow"><div><h1>Automations</h1><p class="x-sub">${state.flows.length} workflows · ${state.flows.filter((f) => f.on).length} on. Click one to edit it.</p></div><button class="x-btn" data-wa="new">+ New workflow</button></div>
-          <div class="x-card"><div class="x-scroll">${table([
+          <div class="x-card">${state.flows.length ? `<div class="x-scroll">${table([
             { label: "Workflow", render: (f) => `<span class="x-cn"><b>${esc(f.name)}</b><small>${f.steps.length} ${f.steps.length === 1 ? "step" : "steps"}</small></span>` },
             { label: "Trigger", render: (f) => esc(trigTxt(f)) }, { label: "Status", render: (f) => tog(f.on, `data-wtg="${f.id}"`, f.name) },
-            { label: "Enrolled", render: (f) => f.enrolled.toLocaleString() }, { label: "Last run", cls: "x-when", render: (f) => (f.last ? ago(mins(f.last)) : "Never") }], state.flows, (f) => `class="x-click" data-flow="${f.id}" tabindex="0"`)}</div></div>`;
+            { label: "Enrolled", render: (f) => f.enrolled.toLocaleString() }, { label: "Last run", cls: "x-when", render: (f) => (f.last ? ago(mins(f.last)) : "Never") }], state.flows, (f) => `class="x-click" data-flow="${f.id}" tabindex="0"`)}</div>` : none("No workflows yet. Create one to automate follow-ups.")}</div>`;
       }
       const so = (list, v) => list.map(([k, l]) => `<option value="${esc(k)}" ${k == v ? "selected" : ""}>${esc(l)}</option>`).join("");
       function sf(s, p) {
@@ -1418,7 +1461,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         const f = ui.flow, last = f.steps.length - 1, tv = tvals(f.trig.t);
         v.innerHTML = `<button class="x-sort x-muted" data-wa="back">← All workflows</button>
           <div class="x-headrow"><div><h1 id="wh">${esc(f.name || "New workflow")}</h1><p class="x-sub">Build the flow top to bottom. ${plural(f.enrolled)} enrolled so far.</p></div>
-            <div class="x-row" style="margin:0">${tog(f.on, 'data-wa="tog"', f.name || "Workflow")}<button class="x-btn" data-wa="save">Save workflow</button></div></div>
+            <div class="x-row" style="margin:0">${state.flows.some((x) => x.id === f.id) ? `<button class="x-btn x-btn--ghost" style="color:#B42318" data-wa="remove">Delete</button>` : ""}${tog(f.on, 'data-wa="tog"', f.name || "Workflow")}<button class="x-btn" data-wa="save">Save workflow</button></div></div>
           <div class="x-ed"><div class="x-card">
             <label class="x-fl">Workflow name<input data-wn value="${esc(f.name)}" placeholder="e.g. Nurture webinar signups" /></label>
             <ol class="x-flow">
@@ -1457,6 +1500,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         if (d.wa === "new") { Object.assign(ui, { flow: { id: 0, name: "", on: false, enrolled: 0, last: 0, trig: { t: "created", v: "" }, steps: [mk("email")] }, wlog: [], wc: "" }); flowEdit(v, "[data-wn]"); }
         else if (d.wa === "back") { ui.flow = null; flowList(v); }
         else if (d.wa === "tog") { f.on = !f.on; flowEdit(v, '[data-wa="tog"]'); }
+        else if (d.wa === "remove") delDoc("flows", state.flows.find((x) => x.id === f.id), f.name || "Untitled workflow", () => { if (cur() === "automations") { ui.flow = null; flowList($("#view")); } });
         else if (d.wa === "add") { f.steps.push(mk(d.t)); flowEdit(v, `#ws-${f.steps.length - 1} .x-sf > *, [data-wa="del"][data-i="${f.steps.length - 1}"]`); }
         else if (d.wa === "del") { f.steps.splice(i, 1); flowEdit(v, "#wpal .x-btn"); }
         else if (d.wa === "up" || d.wa === "down") { const j = d.wa === "up" ? i - 1 : i + 1; [f.steps[i], f.steps[j]] = [f.steps[j], f.steps[i]]; flowEdit(v, `[data-wa="${d.wa}"][data-i="${j}"]:not(:disabled), [data-wa="del"][data-i="${j}"]`); }
@@ -1536,12 +1580,12 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
       function svList(v) {
         v.innerHTML = `<h1>Surveys</h1><p class="x-sub">${state.surveys.length} surveys · ${state.surveys.reduce((a, s) => a + s.resp.length, 0)} responses. Click a survey for its responses and question builder.</p>
           <div class="x-card" style="margin-bottom:16px">${svTog()}</div>
-          <div class="x-card"><div class="x-scroll">${table([{ label: "Survey", render: (s) => `<span class="x-cn"><b>${esc(s.name)}</b><small>${esc(s.trig)}</small></span>` }, { label: "Type", render: (s) => `<span class="x-tag" data-q>${SQT[s.type]}</span>` },
-            { label: "Responses", render: (s) => s.resp.length }, { label: "Score", render: svCell }], state.surveys, (s) => `class="x-click" data-svid="${s.id}" tabindex="0"`)}</div></div>`;
+          <div class="x-card">${state.surveys.length ? `<div class="x-scroll">${table([{ label: "Survey", render: (s) => `<span class="x-cn"><b>${esc(s.name)}</b><small>${esc(s.trig)}</small></span>` }, { label: "Type", render: (s) => `<span class="x-tag" data-q>${SQT[s.type]}</span>` },
+            { label: "Responses", render: (s) => s.resp.length }, { label: "Score", render: svCell }], state.surveys, (s) => `class="x-click" data-svid="${s.id}" tabindex="0"`)}</div>` : none("No surveys yet.")}</div>`;
       }
       function svEdit(v) {
         const s = svGet(), [p, pa, d] = svCnt(s), L = [["Promoters 9–10", p, "var(--x-primary)"], ["Passives 7–8", pa, "var(--x-c4)"], ["Detractors 0–6", d, "#B42318"]];
-        v.innerHTML = `<button class="x-btn x-btn--ghost" data-sva="back">← All surveys</button><h1 style="margin-top:14px">${esc(s.name)}</h1><p class="x-sub">${esc(s.trig)} · ${SQT[s.type]}</p>
+        v.innerHTML = `<div class="x-headrow" style="margin:0"><button class="x-btn x-btn--ghost" data-sva="back">← All surveys</button><button class="x-btn x-btn--ghost" style="color:#B42318" data-sva="remove">Delete survey</button></div><h1 style="margin-top:14px">${esc(s.name)}</h1><p class="x-sub">${esc(s.trig)} · ${SQT[s.type]}</p>
           <div class="x-grid">
             <div class="x-card x-kpi x-s4"><div class="x-lab">Responses</div><div class="x-fig">${s.resp.length}</div></div>
             <div class="x-card x-kpi x-s8 x-svk"><div class="x-lab">${s.type === "NPS" ? "Net Promoter Score · −100 to 100" : s.type === "CSAT" ? "CSAT · share rating 4 or 5" : "Open text has no score"}</div><div class="x-fig">${svFig(s)}</div>${svBar(s)}
@@ -1577,6 +1621,7 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         const r = e.target.closest("[data-svid]"), a = e.target.closest("[data-sva]"), n = e.target.closest("[data-svn]"), v = $("#view");
         if (r) { ui.sv = +r.dataset.svid; ui.svPick = null; surveys(v, '[data-sva="back"]'); v.scrollTop = 0; }
         else if (a?.dataset.sva === "back") { ui.sv = null; surveys(v); }
+        else if (a?.dataset.sva === "remove") { const s = svGet(); delDoc("surveys", s, s?.name || "Untitled survey", () => { if (cur() === "surveys") { ui.sv = null; surveys($("#view")); } }); }
         else if (a?.dataset.sva === "auto") { state.svAuto = !state.svAuto; surveys(v, '[data-sva="auto"]'); toast(state.svAuto ? "Surveys will send when a ticket is closed." : "Automatic surveys off."); }
         else if (n) { ui.svPick = +n.dataset.svn; n.parentElement.querySelectorAll("button").forEach((b) => b.setAttribute("aria-checked", b === n)); }
       });
@@ -1851,10 +1896,11 @@ Sofia Hernández|11|Lead|41|Ananya|3600`;
         }
         async function signOut() {
           $("#medrop").hidden = true; $("#me").setAttribute("aria-expanded", "false");
+          await flushSaves(); // write pending edits while the session and workspace are still set
           try { await sb.auth.signOut(); } catch (err) { console.warn("GrowthMonk auth:", err); }
           window.gmWorkspaceId = undefined;
           state.contacts.length = 0; state.companies.length = 0;
-          Object.values(persistTimers).forEach(clearTimeout); Object.keys(persistTimers).forEach((k) => delete persistTimers[k]);
+          Object.values(persistTimers).forEach((p) => clearTimeout(p.t)); Object.keys(persistTimers).forEach((k) => delete persistTimers[k]);
           Object.keys(DOCS).forEach((k) => (state[k].length = 0)); segSync();
           closeDrawer(); document.querySelectorAll(".x-modal").forEach((m) => m.remove());
           show("signin");

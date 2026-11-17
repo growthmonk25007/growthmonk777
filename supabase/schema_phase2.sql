@@ -52,6 +52,12 @@ begin
     update contacts set last_activity_at = now() where id = cid;
   end if;
   insert into form_submissions(workspace_id, form_id, source, data, contact_id) values (ws, p_form_id, left(p_source,120), p_data, cid);
+  -- Count the submission here, once, so the app never adds its own +1 in Supabase mode (a submission also counts as a view)
+  update forms set data = data || jsonb_build_object(
+      'subs', (case when data->>'subs' ~ '^\d+$' then (data->>'subs')::int else 0 end) + 1,
+      'views', (case when data->>'views' ~ '^\d+$' then (data->>'views')::int else 0 end) + 1),
+    updated_at = now()
+  where id = p_form_id;
   return cid;
 end; $$;
 grant execute on function public.submit_form(text, text, jsonb) to anon, authenticated;
